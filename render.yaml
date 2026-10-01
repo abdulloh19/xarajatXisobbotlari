@@ -17,7 +17,7 @@ services:
       - key: APP_TIMEZONE
         value: Asia/Tashkent
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        value: 8828605194:AAEp1SExRuB8VN63F8tvJKKPAPv9uAOOEnw
       - key: TELEGRAM_BOT_USERNAME
         value: gggg1232_bot
       - key: AI_API_KEY
@@ -49,5 +49,4 @@ databases:
   - name: hisobchi-db
     plan: free
     region: frankfurt
-    databaseName: hisobchi_bot
-    user: postgres
+
