@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hisobchi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hisobchi_bot}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      TZ: ${APP_TIMEZONE:-Asia/Tashkent}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-hisobchi_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hisobchi-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hisobchi-bot-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-hisobchi_bot}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hisobchi_bot}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      SPEECH_TO_TEXT_MODEL: ${SPEECH_TO_TEXT_MODEL:-whisper-1}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Tashkent}
+    ports:
+      - "8080:8080"
+    networks:
+      - hisobchi-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  hisobchi-network:
+    driver: bridge

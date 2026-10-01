@@ -1,0 +1,48 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbattrs.xml
+/build/
+
+### VS Code ###
+.vscode/
+
+### Secrets and Environment ###
+.env
+*.local
+*.log
+
+### OS Files ###
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+### Temporary Audio Files ###
+temp_audio/
+*.ogg
+*.mp3
+*.wav

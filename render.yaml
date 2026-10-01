@@ -1,0 +1,53 @@
+# ==============================================================================
+# Render Blueprint Configuration for Hisobchi Bot (Free Tier)
+# ==============================================================================
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: hisobchi-bot
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: APP_TIMEZONE
+        value: Asia/Tashkent
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: gggg1232_bot
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_ENABLED
+        value: "true"
+      - key: DB_HOST
+        fromDatabase:
+          name: hisobchi-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: hisobchi-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: hisobchi-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: hisobchi-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: hisobchi-db
+          property: password
+
+databases:
+  - name: hisobchi-db
+    plan: free
+    region: frankfurt
+    databaseName: hisobchi_bot
+    user: postgres

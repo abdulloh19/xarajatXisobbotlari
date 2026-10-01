@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: hisobchi-bot-test
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+  flyway:
+    enabled: false
+
+bot:
+  token: "test_bot_token_mock"
+  username: "test_hisobchi_bot"
+  default-timezone: "Asia/Tashkent"
+  speech-to-text:
+    api-key: "mock-key"
+    base-url: "https://api.openai.com/v1"
+    model: "whisper-1"
+  ai:
+    api-key: "mock-key"
+    base-url: "https://api.openai.com/v1"
+    model: "gpt-4o-mini"
+    enabled: false
+  draft-ttl-minutes: 30
+
+logging:
+  level:
+    root: WARN
+    com.hisobchi.bot: INFO
