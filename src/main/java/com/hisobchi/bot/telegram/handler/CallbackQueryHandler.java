@@ -28,6 +28,7 @@ import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionDraft;
 import com.hisobchi.bot.transaction.entity.TransactionSource;
 import com.hisobchi.bot.transaction.entity.TransactionType;
+import com.hisobchi.bot.transaction.repository.TransactionRepository;
 import com.hisobchi.bot.transaction.service.TransactionDraftService;
 import com.hisobchi.bot.transaction.service.TransactionService;
 import com.hisobchi.bot.user.entity.User;
@@ -50,6 +51,7 @@ public class CallbackQueryHandler {
     private final TelegramApiClient apiClient;
     private final TransactionDraftService draftService;
     private final TransactionService transactionService;
+    private final TransactionRepository transactionRepository;
     private final CategoryService categoryService;
     private final StatisticsService statisticsService;
     private final DailySummaryService dailySummaryService;
@@ -781,8 +783,8 @@ public class CallbackQueryHandler {
         if ("daily".equals(parts[1])) {
             LocalDate today = DateTimeUtils.today(user.getTimezone());
             var data = reportService.getDailyReportData(user.getId(), today);
-            String msg = reportService.formatDailyReport(data);
-            apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+            String msg = reportService.formatDailyReport(data, user.getId());
+            apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
         }
     }
 
@@ -807,7 +809,8 @@ public class CallbackQueryHandler {
                     String successMsg = BotMessageBuilder.buildSaveSuccessMessage(
                             saved, stats.totalExpense(), stats.totalIncome(), stats.netProfit());
 
-                    apiClient.editMessageText(chatId, messageId, successMsg, null, "HTML");
+                    apiClient.editMessageText(chatId, messageId, successMsg,
+                            inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
                     userService.updateState(user.getTelegramId(), UserState.IDLE);
 
                 } catch (ValidationException e) {
@@ -926,6 +929,25 @@ public class CallbackQueryHandler {
 
     private void handleTransactionCallback(User user, Long chatId, Integer messageId, String[] parts) {
         String action = parts[1];
+
+        if ("list_today".equals(action) || "list_date".equals(action)) {
+            LocalDate date = ("list_date".equals(action) && parts.length > 2)
+                    ? LocalDate.parse(parts[2])
+                    : DateTimeUtils.today(user.getTimezone());
+            List<Transaction> transactions = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), date);
+            if (transactions.isEmpty()) {
+                apiClient.editMessageText(chatId, messageId,
+                        "ℹ️ <b>" + DateTimeUtils.formatDate(date) + "</b> kuni operatsiyalar mavjud emas.",
+                        inlineKeyboardFactory.getDailyReportActionsKeyboard(date), "HTML");
+                return;
+            }
+            String msg = "🧾 <b>" + DateTimeUtils.formatDate(date) + " kungi operatsiyalar:</b>\n" +
+                    "<i>Tahrirlash yoki kategoriyani o‘zgartirish uchun kerakli operatsiyani bosing:</i>";
+            apiClient.editMessageText(chatId, messageId, msg,
+                    inlineKeyboardFactory.getDailyOperationsKeyboard(transactions, date), "HTML");
+            return;
+        }
+
         Long txId = Long.parseLong(parts[2]);
 
         switch (action) {
@@ -943,7 +965,9 @@ public class CallbackQueryHandler {
             }
             case "delete_confirm" -> {
                 transactionService.deleteTransaction(txId, user.getId());
-                apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>", null, "HTML");
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>",
+                        inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
             }
             case "delete_cancel" -> {
                 Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
@@ -955,6 +979,36 @@ public class CallbackQueryHandler {
             case "edit" -> {
                 apiClient.editMessageText(chatId, messageId, "Qaysi maydonni tahrirlaysiz?",
                         inlineKeyboardFactory.getEditTransactionFieldsKeyboard(txId), null);
+            }
+            case "edit_field" -> {
+                String field = parts[3];
+                switch (field) {
+                    case "cat" -> {
+                        Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
+                        List<Category> categories = categoryService.getCategories(user.getId(), tx.getType());
+                        apiClient.editMessageText(chatId, messageId, "📂 <b>Yangi kategoriyani tanlang:</b>",
+                                inlineKeyboardFactory.getTransactionCategorySelectionKeyboard(txId, categories), "HTML");
+                    }
+                    case "amount" -> {
+                        textMessageHandler.setUserEditingTransactionId(user.getId(), txId);
+                        userService.updateState(user.getTelegramId(), UserState.WAITING_TX_EDIT_AMOUNT);
+                        apiClient.sendMessage(chatId, "Yangi summani kiriting (masalan: <code>20000</code>):",
+                                replyKeyboardFactory.getCancelMenu(), "HTML");
+                    }
+                    case "desc" -> {
+                        textMessageHandler.setUserEditingTransactionId(user.getId(), txId);
+                        userService.updateState(user.getTelegramId(), UserState.WAITING_TX_EDIT_DESCRIPTION);
+                        apiClient.sendMessage(chatId, "Yangi izohni kiriting:", replyKeyboardFactory.getCancelMenu(), null);
+                    }
+                }
+            }
+            case "set_cat" -> {
+                Long categoryId = Long.parseLong(parts[3]);
+                Category cat = categoryService.getById(categoryId, user.getId());
+                TransactionDto updated = transactionService.updateTransaction(txId, user.getId(), null, cat, null, null);
+                String msg = "✅ <b>Kategoriya o‘zgartirildi!</b>\n\n" + BotMessageBuilder.buildTransactionDetail(updated, user.getTimezone());
+                apiClient.editMessageText(chatId, messageId, msg,
+                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
             }
         }
     }

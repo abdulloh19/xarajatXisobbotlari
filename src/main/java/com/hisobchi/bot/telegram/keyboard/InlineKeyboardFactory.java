@@ -3,8 +3,11 @@ package com.hisobchi.bot.telegram.keyboard;
 import com.hisobchi.bot.category.entity.Category;
 import com.hisobchi.bot.debt.entity.Debt;
 import com.hisobchi.bot.debt.entity.DebtType;
+import com.hisobchi.bot.common.formatter.MoneyFormatter;
 import com.hisobchi.bot.notification.entity.NotificationSettings;
 import com.hisobchi.bot.telegram.client.model.TelegramModels.*;
+import com.hisobchi.bot.transaction.entity.Transaction;
+import com.hisobchi.bot.transaction.entity.TransactionType;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -111,11 +114,12 @@ public class InlineKeyboardFactory {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("✏️ Tahrirlash", "tx:edit:" + transactionId),
-                                new InlineKeyboardButton("🗑 O‘chirish", "tx:delete_ask:" + transactionId)
+                                new InlineKeyboardButton("📂 Kategoriyani o‘zgartirish", "tx:edit_field:" + transactionId + ":cat"),
+                                new InlineKeyboardButton("✏️ Tahrirlash", "tx:edit:" + transactionId)
                         ),
                         List.of(
-                                new InlineKeyboardButton("⬅️ Tarixga qaytish", "history:back")
+                                new InlineKeyboardButton("🗑 O‘chirish", "tx:delete_ask:" + transactionId),
+                                new InlineKeyboardButton("🧾 Operatsiyalar", "tx:list_today")
                         )
                 ))
                 .build();
@@ -144,6 +148,72 @@ public class InlineKeyboardFactory {
                         ),
                         List.of(
                                 new InlineKeyboardButton("⬅️ Orqaga", "tx:detail:" + transactionId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getTransactionCategorySelectionKeyboard(Long transactionId, List<Category> categories) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> currentRow = new ArrayList<>();
+
+        for (Category cat : categories) {
+            String text = (cat.getEmoji() != null ? cat.getEmoji() + " " : "") + cat.getName();
+            currentRow.add(new InlineKeyboardButton(text, "tx:set_cat:" + transactionId + ":" + cat.getId()));
+
+            if (currentRow.size() == 2) {
+                rows.add(new ArrayList<>(currentRow));
+                currentRow.clear();
+            }
+        }
+        if (!currentRow.isEmpty()) {
+            rows.add(currentRow);
+        }
+
+        rows.add(List.of(
+                new InlineKeyboardButton("⬅️ Orqaga", "tx:detail:" + transactionId)
+        ));
+
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getSavedTransactionKeyboard(Long transactionId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("📂 Kategoriyani o‘zgartirish", "tx:edit_field:" + transactionId + ":cat"),
+                                new InlineKeyboardButton("✏️ Tahrirlash", "tx:detail:" + transactionId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDailyOperationsKeyboard(List<Transaction> transactions, LocalDate date) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        if (transactions != null) {
+            for (Transaction tx : transactions) {
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : "📌";
+                String name = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+                String prefix = tx.getType() == TransactionType.INCOME ? "+" : "-";
+                String label = emoji + " " + name + " (" + prefix + MoneyFormatter.format(tx.getAmount()) + ")";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "tx:detail:" + tx.getId())
+                ));
+            }
+        }
+        rows.add(List.of(
+                new InlineKeyboardButton("⬅️ Orqaga", "report:daily")
+        ));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getDailyReportActionsKeyboard(LocalDate date) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🧾 Operatsiyalarni ko‘rish / tahrirlash", "tx:list_date:" + date),
+                                new InlineKeyboardButton("💵 Foydani o‘zgartirish", "profit:enter")
                         )
                 ))
                 .build();

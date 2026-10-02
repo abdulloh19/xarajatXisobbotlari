@@ -37,6 +37,7 @@ import com.hisobchi.bot.transaction.entity.TransactionSource;
 import com.hisobchi.bot.transaction.entity.TransactionType;
 import com.hisobchi.bot.transaction.repository.TransactionRepository;
 import com.hisobchi.bot.transaction.service.TransactionDraftService;
+import com.hisobchi.bot.transaction.service.TransactionService;
 import com.hisobchi.bot.user.entity.User;
 import com.hisobchi.bot.user.entity.UserState;
 import com.hisobchi.bot.user.service.UserService;
@@ -78,6 +79,7 @@ public class TextMessageHandler {
     private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
     private final DebtNlpHandler debtNlpHandler;
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
+    private final TransactionService transactionService;
 
     // Temporary multi-step state storage per user
     private final ConcurrentHashMap<Long, BigDecimal> userCashProfits = new ConcurrentHashMap<>();
@@ -87,6 +89,11 @@ public class TextMessageHandler {
     private final ConcurrentHashMap<Long, DebtType> userDebtTypes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Long> userActiveDebtDraftId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Long> userExtendingDebtId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Long> userEditingTransactionId = new ConcurrentHashMap<>();
+
+    public void setUserEditingTransactionId(Long userId, Long txId) {
+        userEditingTransactionId.put(userId, txId);
+    }
 
     public void setExtendingDebtId(Long userId, Long debtId) {
         userExtendingDebtId.put(userId, debtId);
@@ -171,7 +178,7 @@ public class TextMessageHandler {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
                 String msg = BotMessageBuilder.buildDailyStatisticsMessage(stats);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
                 return;
             }
             case "📅 Haftalik statistika" -> {
@@ -371,14 +378,14 @@ public class TextMessageHandler {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 ReportData report = reportService.getDailyReportData(user.getId(), today);
                 String msg = reportService.formatDailyReport(report, user.getId());
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
                 return;
             }
             case "📅 Kecha" -> {
                 LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
                 ReportData report = reportService.getDailyReportData(user.getId(), yesterday);
                 String msg = reportService.formatDailyReport(report);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getHistoryMenu(), "HTML");
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(yesterday), "HTML");
                 return;
             }
             case "📅 Oxirgi 7 kun" -> {
@@ -870,6 +877,35 @@ public class TextMessageHandler {
                     DraftDto dto = draftService.toDto(draft);
                     String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
                     apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                }
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+            }
+            case WAITING_TX_EDIT_AMOUNT -> {
+                Optional<BigDecimal> amountOpt = amountParser.parse(text);
+                if (amountOpt.isEmpty() || amountOpt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ To‘g‘ri summa kiriting (masalan: <code>20000</code>):",
+                            replyKeyboardFactory.getCancelMenu(), null);
+                    return;
+                }
+                Long txId = userEditingTransactionId.remove(user.getId());
+                if (txId != null) {
+                    TransactionDto updated = transactionService.updateTransaction(txId, user.getId(), amountOpt.get(), null, null, null);
+                    String msg = "✅ <b>Summa yangilandi!</b>\n\n" + BotMessageBuilder.buildTransactionDetail(updated, user.getTimezone());
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
+                } else {
+                    apiClient.sendMessage(chatId, "Operatsiya topilmadi.", replyKeyboardFactory.getMainMenu(), null);
+                }
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+            }
+            case WAITING_TX_EDIT_DESCRIPTION -> {
+                Long txId = userEditingTransactionId.remove(user.getId());
+                if (txId != null) {
+                    String desc = ("❌ Bekor qilish".equals(text) || "⏭ O‘tkazib yuborish".equals(text)) ? null : text;
+                    TransactionDto updated = transactionService.updateTransaction(txId, user.getId(), null, null, desc, null);
+                    String msg = "✅ <b>Izoh yangilandi!</b>\n\n" + BotMessageBuilder.buildTransactionDetail(updated, user.getTimezone());
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
+                } else {
+                    apiClient.sendMessage(chatId, "Operatsiya topilmadi.", replyKeyboardFactory.getMainMenu(), null);
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
