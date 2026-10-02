@@ -80,13 +80,13 @@ public final class BotMessageBuilder {
         if (tx.type() == TransactionType.INCOME) {
             sb.append("💰 +").append(MoneyFormatter.format(tx.amount())).append("\n");
             sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
-            sb.append("Bugungi jami daromad:\n<b>").append(MoneyFormatter.format(todayTotalIncome)).append("</b>\n\n");
-            sb.append("Bugungi sof foyda:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
+            sb.append("💰 Bugungi umumiy ishlab topilgan:\n<b>").append(MoneyFormatter.format(todayTotalIncome)).append("</b>\n\n");
+            sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
         } else {
             sb.append("💸 ").append(MoneyFormatter.format(tx.amount())).append("\n");
             sb.append(tx.getCategoryDisplayName()).append("\n\n");
-            sb.append("Bugungi jami xarajat:\n<b>").append(MoneyFormatter.format(todayTotalExpense)).append("</b>\n\n");
-            sb.append("Bugungi sof foyda:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
+            sb.append("💸 Bugungi xarajatlar:\n<b>").append(MoneyFormatter.format(todayTotalExpense)).append("</b>\n\n");
+            sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
         }
         return sb.toString();
     }
@@ -96,19 +96,19 @@ public final class BotMessageBuilder {
         sb.append("📊 <b>BUGUNGI HISOBOT</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
         sb.append("📅 ").append(DateTimeUtils.formatUzbekDate(stats.date())).append("\n\n");
-        sb.append("💰 <b>Daromad:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
-        sb.append("💸 <b>Xarajat:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
+        sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
+        sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");
-        sb.append("✅ <b>SOF FOYDA:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
+        sb.append("✅ <b>BUGUNGI FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
-            sb.append("📂 <b>XARAJATLAR:</b>\n\n");
+            sb.append("📁 <b>XARAJATLAR:</b>\n\n");
             for (CategoryExpenseDto cat : stats.expenseCategories()) {
                 sb.append(cat.getDisplayName()).append("\n")
                         .append(MoneyFormatter.format(cat.totalAmount())).append("\n\n");
             }
-            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
         }
 
         sb.append("🧾 Operatsiyalar: ").append(stats.transactionCount()).append(" ta\n");
@@ -123,14 +123,14 @@ public final class BotMessageBuilder {
         sb.append("📅 <b>HAFTALIK HISOBOT</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
         sb.append(DateTimeUtils.formatUzbekDateRange(stats.startDate(), stats.endDate())).append("\n\n");
-        sb.append("💰 <b>Jami daromad:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
-        sb.append("💸 <b>Jami xarajat:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
+        sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
+        sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");
-        sb.append("✅ <b>Sof foyda:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
+        sb.append("✅ <b>HAFTALIK FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
-            sb.append("📊 <b>Xarajat taqsimoti:</b>\n\n");
+            sb.append("📁 <b>XARAJATLAR:</b>\n\n");
             for (CategoryExpenseDto cat : stats.expenseCategories()) {
                 sb.append(cat.getDisplayName()).append(" — ")
                         .append(MoneyFormatter.format(cat.totalAmount())).append("\n");
@@ -152,10 +152,10 @@ public final class BotMessageBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("🗓 <b>").append(DateTimeUtils.formatUzbekMonthYear(stats.monthDate())).append(" HISOBOTI</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
-        sb.append("💰 <b>Jami ishladingiz:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
-        sb.append("💸 <b>Jami xarajat:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
+        sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
+        sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");
-        sb.append("✅ <b>Sof foyda:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
+        sb.append("✅ <b>OYLIK FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {

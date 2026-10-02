@@ -151,23 +151,27 @@ public class ReportService {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 <b>BUGUNGI YAKUNIY HISOBOT</b>\n");
+        sb.append("📊 <b>BUGUNGI HISOBOT</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
         sb.append("📅 <b>").append(data.periodStart().format(DATE_FMT)).append("</b>\n\n");
-        sb.append("💰 <b>Bugun ishladingiz:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
-        sb.append("💸 <b>Jami xarajat:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
-        sb.append("✅ <b>Qo‘lingizda qolgan foyda:</b>\n").append(MoneyFormatter.format(data.totalProfit())).append("\n\n");
-        sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
-        sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+        sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
+        sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");
-        sb.append("📂 <b>Xarajatlar:</b>\n\n");
+        sb.append("✅ <b>BUGUNGI FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(data.totalProfit())).append("</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        if (data.cashProfit().compareTo(BigDecimal.ZERO) > 0 || data.cardProfit().compareTo(BigDecimal.ZERO) > 0) {
+            sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
+            sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+        }
+        sb.append("📁 <b>XARAJATLAR:</b>\n\n");
 
         if (data.categoryExpenses().isEmpty()) {
             sb.append("<i>Xarajatlar mavjud emas</i>\n");
         } else {
             for (CategoryExpenseDto c : data.categoryExpenses()) {
                 sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
-                        .append(" — <b>").append(MoneyFormatter.format(c.totalAmount())).append("</b>\n");
+                        .append("\n").append(MoneyFormatter.format(c.totalAmount())).append("\n\n");
             }
         }
 
@@ -179,19 +183,23 @@ public class ReportService {
         if (!data.profitEntered()) {
             sb.append(String.format(
                     "⚠️ <b>Bugungi foyda hali kiritilmagan.</b>\n\n" +
-                    "💸 <b>Bugungi xarajat:</b>\n%s\n\n" +
+                    "💸 <b>Bugungi xarajatlar:</b>\n%s\n\n" +
                     "💰 Jami ishlangan pulni hisoblash uchun foydani kiriting.\n\n",
                     MoneyFormatter.format(data.totalExpense())
             ));
         } else {
-            sb.append("🚕 <b>BUGUNGI HISOBOT</b>\n");
+            sb.append("📊 <b>BUGUNGI HISOBOT</b>\n");
             sb.append("━━━━━━━━━━━━━━━━━━\n\n");
             sb.append("📅 <b>").append(data.periodStart().format(DATE_FMT)).append("</b>\n\n");
-            sb.append("💰 <b>Taksida ishladingiz:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
-            sb.append("💸 <b>Kundalik xarajat:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
-            sb.append("✅ <b>Ishdan qolgan foyda:</b>\n").append(MoneyFormatter.format(data.totalProfit())).append("\n\n");
-            sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
-            sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+            sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
+            sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("✅ <b>BUGUNGI FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(data.totalProfit())).append("</b>\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+            if (data.cashProfit().compareTo(BigDecimal.ZERO) > 0 || data.cardProfit().compareTo(BigDecimal.ZERO) > 0) {
+                sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
+                sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+            }
         }
 
         // Debt movements for today (Section 28)
@@ -254,13 +262,17 @@ public class ReportService {
         sb.append("📅 <b>").append(data.periodStart().format(SHORT_DATE_FMT))
                 .append(" — ").append(data.periodEnd().format(DATE_FMT)).append("</b>\n\n");
 
-        sb.append("💰 <b>Jami ishlangan:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
-        sb.append("💸 <b>Jami xarajat:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
-        sb.append("✅ <b>Qo‘lda qolgan foyda:</b>\n").append(MoneyFormatter.format(data.totalProfit())).append("\n\n");
-        sb.append("💵 <b>Naqd foyda:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
-        sb.append("💳 <b>Kartadagi foyda:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+        sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
+        sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");
-        sb.append("📂 <b>Xarajatlar:</b>\n\n");
+        sb.append("✅ <b>FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(data.totalProfit())).append("</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        if (data.cashProfit().compareTo(BigDecimal.ZERO) > 0 || data.cardProfit().compareTo(BigDecimal.ZERO) > 0) {
+            sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
+            sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+        }
+        sb.append("📁 <b>XARAJATLAR:</b>\n\n");
 
         if (data.categoryExpenses().isEmpty()) {
             sb.append("<i>Xarajatlar mavjud emas</i>\n");
@@ -272,13 +284,13 @@ public class ReportService {
         }
 
         sb.append("\n━━━━━━━━━━━━━━━━━━\n");
-        sb.append("📆 <b>Ishlangan kunlar:</b> ").append(data.activeDays()).append(" kun\n");
+        sb.append("📆 <b>Ishlangan kunlar:</b> ").append(data.activeDays()).append(" kun\n\n");
 
         long daysDiv = Math.max(data.activeDays(), 1);
         BigDecimal avgEarned = data.totalEarned().divide(BigDecimal.valueOf(daysDiv), 0, RoundingMode.HALF_UP);
         BigDecimal avgProfit = data.totalProfit().divide(BigDecimal.valueOf(daysDiv), 0, RoundingMode.HALF_UP);
 
-        sb.append("💰 <b>O‘rtacha kunlik ishlangan:</b> ").append(MoneyFormatter.format(avgEarned)).append("\n");
+        sb.append("💰 <b>O‘rtacha kunlik ishlab topilgan:</b> ").append(MoneyFormatter.format(avgEarned)).append("\n");
         sb.append("✅ <b>O‘rtacha kunlik foyda:</b> ").append(MoneyFormatter.format(avgProfit)).append("\n");
 
         if (data.incompleteDays() > 0) {

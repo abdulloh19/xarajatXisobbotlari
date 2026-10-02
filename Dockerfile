@@ -18,8 +18,9 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Install curl for container health check
-RUN apk --no-cache add curl tzdata
+# Install curl, tzdata, python and ffmpeg for speech recognition
+RUN apk --no-cache add curl tzdata python3 py3-pip ffmpeg && \
+    pip install --no-cache-dir imageio-ffmpeg SpeechRecognition --break-system-packages
 
 # Create dedicated non-root application user
 RUN addgroup -S hisobchi && adduser -S hisobchi -G hisobchi
@@ -27,7 +28,8 @@ RUN addgroup -S hisobchi && adduser -S hisobchi -G hisobchi
 # Set default timezone to Asia/Tashkent
 ENV TZ=Asia/Tashkent
 
-# Copy compiled jar from build stage
+# Copy scripts and compiled jar from build stage
+COPY scripts ./scripts
 COPY --from=builder /build/target/hisobchi-bot-1.0.0.jar app.jar
 RUN chown -R hisobchi:hisobchi /app
 

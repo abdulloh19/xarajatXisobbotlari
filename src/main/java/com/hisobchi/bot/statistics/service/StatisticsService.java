@@ -22,7 +22,12 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
+import com.hisobchi.bot.profit.entity.DailyProfit;
+import com.hisobchi.bot.profit.service.DailyProfitService;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -31,17 +36,31 @@ public class StatisticsService {
 
     private final TransactionRepository transactionRepository;
     private final DailySummaryService dailySummaryService;
+    private final DailyProfitService dailyProfitService;
 
     @Transactional(readOnly = true)
     public DailyStatisticsDto getDailyStatistics(User user, LocalDate date) {
-        BigDecimal totalIncome = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.EXPENSE, date);
-        BigDecimal netProfit = totalIncome.subtract(totalExpense);
+        if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), date);
+        BigDecimal enteredProfit = BigDecimal.ZERO;
+        if (profitOpt.isPresent()) {
+            enteredProfit = profitOpt.get().getTotalProfit();
+        } else {
+            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+            if (inc != null) enteredProfit = inc;
+        }
+
+        // FORMULA: totalEarned = profit + expenses, netProfit = enteredProfit (real profit)
+        BigDecimal totalEarned = enteredProfit.add(totalExpense);
+        BigDecimal netProfit = enteredProfit;
+
         long count = transactionRepository.countByUserIdAndDate(user.getId(), date);
         List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, date);
         boolean isClosed = dailySummaryService.isDayClosed(user.getId(), date);
 
-        return new DailyStatisticsDto(date, totalIncome, totalExpense, netProfit, count, categories, isClosed);
+        return new DailyStatisticsDto(date, totalEarned, totalExpense, netProfit, count, categories, isClosed);
     }
 
     @Transactional(readOnly = true)
@@ -49,18 +68,37 @@ public class StatisticsService {
         LocalDate startDate = referenceDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate endDate = referenceDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
 
-        BigDecimal totalIncome = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
-                user.getId(), TransactionType.INCOME, startDate, endDate);
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
                 user.getId(), TransactionType.EXPENSE, startDate, endDate);
-        BigDecimal netProfit = totalIncome.subtract(totalExpense);
+        if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        List<DailyProfit> profitList = dailyProfitService.getProfitsBetween(user.getId(), startDate, endDate);
+        Map<LocalDate, BigDecimal> profitMap = new HashMap<>();
+        for (DailyProfit dp : profitList) {
+            profitMap.put(dp.getProfitDate(), dp.getTotalProfit());
+        }
+
+        BigDecimal totalProfit = BigDecimal.ZERO;
+        for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
+            if (profitMap.containsKey(d)) {
+                totalProfit = totalProfit.add(profitMap.get(d));
+            } else {
+                BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
+                if (inc != null) {
+                    totalProfit = totalProfit.add(inc);
+                }
+            }
+        }
+
+        BigDecimal totalEarned = totalProfit.add(totalExpense);
+        BigDecimal netProfit = totalProfit;
         long count = transactionRepository.countByUserIdAndDateBetween(user.getId(), startDate, endDate);
         List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesBetween(
                 user.getId(), TransactionType.EXPENSE, startDate, endDate);
 
         CategoryExpenseDto topCategory = categories.isEmpty() ? null : categories.get(0);
 
-        return new WeeklyStatisticsDto(startDate, endDate, totalIncome, totalExpense, netProfit, count, categories, topCategory);
+        return new WeeklyStatisticsDto(startDate, endDate, totalEarned, totalExpense, netProfit, count, categories, topCategory);
     }
 
     @Transactional(readOnly = true)
@@ -68,11 +106,30 @@ public class StatisticsService {
         LocalDate startDate = referenceDate.with(TemporalAdjusters.firstDayOfMonth());
         LocalDate endDate = referenceDate.with(TemporalAdjusters.lastDayOfMonth());
 
-        BigDecimal totalIncome = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
-                user.getId(), TransactionType.INCOME, startDate, endDate);
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
                 user.getId(), TransactionType.EXPENSE, startDate, endDate);
-        BigDecimal netProfit = totalIncome.subtract(totalExpense);
+        if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        List<DailyProfit> profitList = dailyProfitService.getProfitsBetween(user.getId(), startDate, endDate);
+        Map<LocalDate, BigDecimal> profitMap = new HashMap<>();
+        for (DailyProfit dp : profitList) {
+            profitMap.put(dp.getProfitDate(), dp.getTotalProfit());
+        }
+
+        BigDecimal totalProfit = BigDecimal.ZERO;
+        for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
+            if (profitMap.containsKey(d)) {
+                totalProfit = totalProfit.add(profitMap.get(d));
+            } else {
+                BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
+                if (inc != null) {
+                    totalProfit = totalProfit.add(inc);
+                }
+            }
+        }
+
+        BigDecimal totalEarned = totalProfit.add(totalExpense);
+        BigDecimal netProfit = totalProfit;
 
         long activeDays = transactionRepository.countActiveDaysBetween(user.getId(), startDate, endDate);
         if (activeDays == 0) {
@@ -80,7 +137,7 @@ public class StatisticsService {
         }
 
         BigDecimal activeDaysBd = BigDecimal.valueOf(activeDays);
-        BigDecimal avgDailyIncome = totalIncome.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
+        BigDecimal avgDailyIncome = totalEarned.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
         BigDecimal avgDailyExpense = totalExpense.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
         BigDecimal avgDailyNetProfit = netProfit.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
 
@@ -89,7 +146,7 @@ public class StatisticsService {
 
         return new MonthlyStatisticsDto(
                 referenceDate,
-                totalIncome,
+                totalEarned,
                 totalExpense,
                 netProfit,
                 activeDays,

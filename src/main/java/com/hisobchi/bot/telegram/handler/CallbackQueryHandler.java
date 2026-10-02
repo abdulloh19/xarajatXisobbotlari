@@ -883,20 +883,20 @@ public class CallbackQueryHandler {
                 String sub = parts[2];
                 if ("confirm".equals(sub)) {
                     DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
-                    var summary = dailySummaryService.closeDay(user, today, stats.totalIncome(), stats.totalExpense());
+                    var summary = dailySummaryService.closeDay(user, today, stats.totalIncome(), stats.totalExpense(), stats.netProfit());
                     String msg = String.format("""
                             🔐 <b>Kun yakunlandi va yopildi!</b>
                             ━━━━━━━━━━━━━━━━━━
                             📅 Sana: <b>%s</b>
 
-                            💰 Jami daromad:
+                            💰 <b>Umumiy ishlab topilgan:</b>
                             <b>%s</b>
 
-                            💸 Jami xarajat:
+                            💸 <b>Xarajatlar:</b>
                             <b>%s</b>
 
                             ━━━━━━━━━━━━━━━━━━
-                            ✅ <b>SOF FOYDA:</b>
+                            ✅ <b>BUGUNGI FOYDANGIZ:</b>
                             <b>%s</b>
                             ━━━━━━━━━━━━━━━━━━
                             """,

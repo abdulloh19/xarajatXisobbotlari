@@ -205,14 +205,16 @@ public class TextMessageHandler {
                 String msg = String.format("""
                         🔐 <b>Kunni yopmoqchimisiz?</b>
 
-                        💰 Daromad:
+                        💰 <b>Umumiy ishlab topilgan:</b>
                         <b>%s</b>
 
-                        💸 Xarajat:
+                        💸 <b>Xarajatlar:</b>
                         <b>%s</b>
 
-                        ✅ Sof foyda:
+                        ━━━━━━━━━━━━━━━━━━
+                        ✅ <b>Bugungi foydangiz:</b>
                         <b>%s</b>
+                        ━━━━━━━━━━━━━━━━━━
                         """,
                         MoneyFormatter.format(stats.totalIncome()),
                         MoneyFormatter.format(stats.totalExpense()),
@@ -454,10 +456,11 @@ public class TextMessageHandler {
 
                         💵 <b>Naqd:</b> %s
                         💳 <b>Karta:</b> %s
-                        💰 <b>Jami foyda:</b> %s
-
-                        💸 <b>Bugungi xarajat:</b> %s
-                        🚀 <b>Bugun ishladingiz:</b> %s
+                        ━━━━━━━━━━━━━━━━━━
+                        ✅ <b>BUGUNGI FOYDA:</b> %s
+                        💸 <b>Xarajatlar:</b> %s
+                        💰 <b>Umumiy ishlab topilgan:</b> %s
+                        ━━━━━━━━━━━━━━━━━━
                         """,
                         MoneyFormatter.format(cash),
                         MoneyFormatter.format(card),

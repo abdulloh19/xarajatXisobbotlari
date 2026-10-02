@@ -32,10 +32,10 @@ public class DailySummaryService {
     }
 
     @Transactional
-    public DailySummary closeDay(User user, LocalDate date, BigDecimal income, BigDecimal expense) {
-        BigDecimal totalIncome = income != null ? income : BigDecimal.ZERO;
-        BigDecimal totalExpense = expense != null ? expense : BigDecimal.ZERO;
-        BigDecimal netProfit = totalIncome.subtract(totalExpense);
+    public DailySummary closeDay(User user, LocalDate date, BigDecimal totalEarned, BigDecimal expense, BigDecimal netProfit) {
+        BigDecimal safeEarned = totalEarned != null ? totalEarned : BigDecimal.ZERO;
+        BigDecimal safeExpense = expense != null ? expense : BigDecimal.ZERO;
+        BigDecimal safeProfit = netProfit != null ? netProfit : BigDecimal.ZERO;
 
         DailySummary summary = dailySummaryRepository.findByUserIdAndSummaryDate(user.getId(), date)
                 .orElseGet(() -> DailySummary.builder()
@@ -43,15 +43,23 @@ public class DailySummaryService {
                         .summaryDate(date)
                         .build());
 
-        summary.setTotalIncome(totalIncome);
-        summary.setTotalExpense(totalExpense);
-        summary.setNetProfit(netProfit);
+        summary.setTotalIncome(safeEarned);
+        summary.setTotalExpense(safeExpense);
+        summary.setNetProfit(safeProfit);
         summary.setClosed(true);
         summary.setClosedAt(Instant.now());
 
-        log.info("Closed day {} for user id {}: income={}, expense={}, profit={}",
-                date, user.getId(), totalIncome, totalExpense, netProfit);
+        log.info("Closed day {} for user id {}: earned={}, expense={}, profit={}",
+                date, user.getId(), safeEarned, safeExpense, safeProfit);
         return dailySummaryRepository.save(summary);
+    }
+
+    @Transactional
+    public DailySummary closeDay(User user, LocalDate date, BigDecimal totalEarned, BigDecimal expense) {
+        BigDecimal safeEarned = totalEarned != null ? totalEarned : BigDecimal.ZERO;
+        BigDecimal safeExpense = expense != null ? expense : BigDecimal.ZERO;
+        BigDecimal safeProfit = safeEarned.compareTo(safeExpense) >= 0 ? safeEarned.subtract(safeExpense) : safeEarned;
+        return closeDay(user, date, safeEarned, safeExpense, safeProfit);
     }
 
     @Transactional

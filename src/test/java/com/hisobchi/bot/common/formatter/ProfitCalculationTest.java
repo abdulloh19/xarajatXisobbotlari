@@ -10,13 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ProfitCalculationTest {
 
     @Test
-    @DisplayName("Profit calculation formula: netProfit = totalIncome - totalExpense")
-    void testNetProfitFormula() {
-        BigDecimal totalIncome = new BigDecimal("3000000");
-        BigDecimal totalExpense = new BigDecimal("1200000");
-        BigDecimal netProfit = totalIncome.subtract(totalExpense);
+    @DisplayName("Profit calculation formula: grossIncome = enteredProfit + totalExpense")
+    void testGrossIncomeFormula() {
+        BigDecimal enteredProfit = new BigDecimal("700000");
+        BigDecimal totalExpense = new BigDecimal("125000");
+        BigDecimal grossIncome = enteredProfit.add(totalExpense);
 
-        assertEquals(new BigDecimal("1800000"), netProfit);
+        assertEquals(new BigDecimal("825000"), grossIncome);
+        assertEquals(new BigDecimal("700000"), enteredProfit);
     }
 
     @Test
