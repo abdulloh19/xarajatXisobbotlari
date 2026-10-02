@@ -95,42 +95,30 @@ public class DebtReminderService {
                     "⏰ <b>QARZ ESLATMASI</b>\n\n" +
                     "Siz <b>%s</b>dan olgan qarzingizni qaytarishga:\n" +
                     "<b>2 kun qoldi.</b>\n\n" +
-                    "💰 <b>Qarz:</b>\n%s\n\n" +
+                    "🔴 <b>Qolgan qarz:</b>\n%s\n\n" +
                     "📅 <b>To‘lash sanasi:</b>\n%s\n\n" +
                     "Qarzni o‘z vaqtida qaytarishni rejalashtirib qo‘ying.\n\n" +
                     "%s",
                     debt.getPersonName(),
-                    MoneyFormatter.format(debt.getAmount()),
+                    MoneyFormatter.format(debt.getRemainingAmount()),
                     debt.getDueDate().format(DATE_FMT),
                     DebtHadithCatalog.getBorrowedHadith()
             );
-            kb = InlineKeyboardMarkup.builder()
-                    .inlineKeyboard(List.of(
-                            List.of(new InlineKeyboardButton("✅ To‘ladim", "debt:pay:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📅 Muddatni o‘zgartirish", "debt:extend:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📋 Qarz tafsilotlari", "debt:view:" + debt.getId()))
-                    ))
-                    .build();
+            kb = inlineKeyboardFactory.getBorrowedReminderKeyboard(debt.getId());
         } else {
             msg = String.format(
                     "⏰ <b>QARZ ESLATMASI</b>\n\n" +
                     "<b>%s</b>ga bergan qarzingizning qaytarilishiga:\n" +
                     "<b>2 kun qoldi.</b>\n\n" +
-                    "💰 <b>Qarz:</b>\n%s\n\n" +
+                    "🟢 <b>Qolgan qarzi:</b>\n%s\n\n" +
                     "📅 <b>Qaytarish sanasi:</b>\n%s\n\n" +
                     "%s",
                     debt.getPersonName(),
-                    MoneyFormatter.format(debt.getAmount()),
+                    MoneyFormatter.format(debt.getRemainingAmount()),
                     debt.getDueDate().format(DATE_FMT),
                     DebtHadithCatalog.getLentRespiteHadith()
             );
-            kb = InlineKeyboardMarkup.builder()
-                    .inlineKeyboard(List.of(
-                            List.of(new InlineKeyboardButton("✅ Qaytarib oldim", "debt:pay:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📅 Muddatni uzaytirish", "debt:extend:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📋 Tafsilotlar", "debt:view:" + debt.getId()))
-                    ))
-                    .build();
+            kb = inlineKeyboardFactory.getLentReminderKeyboard(debt.getId());
         }
 
         sendAndLog(user, debt, reminderType, today, msg, kb);
@@ -156,13 +144,12 @@ public class DebtReminderService {
             String msg;
             if (hour == 9) {
                 msg = String.format(
-                        "⏰ <b>Bugun qarzingizni to‘lash kuni</b>\n\n" +
-                        "👤 <b>%s</b>\n" +
-                        "💰 <b>%s</b>\n\n" +
-                        "Qarzingizni to‘ladingizmi?\n\n" +
+                        "⏰ <b>Bugun %sga qarzni to‘lash kuni.</b>\n\n" +
+                        "🔴 <b>Qolgan:</b>\n%s\n\n" +
+                        "To‘ladingizmi?\n\n" +
                         "%s",
                         debt.getPersonName(),
-                        MoneyFormatter.format(debt.getAmount()),
+                        MoneyFormatter.format(debt.getRemainingAmount()),
                         DebtHadithCatalog.getBorrowedHadith()
                 );
             } else {
@@ -171,18 +158,11 @@ public class DebtReminderService {
                         "<b>%s</b>ga bo‘lgan <b>%s</b> qarzingiz bugun to‘lanishi kerak.\n\n" +
                         "To‘ladingizmi?",
                         debt.getPersonName(),
-                        MoneyFormatter.format(debt.getAmount())
+                        MoneyFormatter.format(debt.getRemainingAmount())
                 );
             }
 
-            InlineKeyboardMarkup kb = InlineKeyboardMarkup.builder()
-                    .inlineKeyboard(List.of(
-                            List.of(new InlineKeyboardButton("✅ To‘ladim", "debt:pay:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("⏰ Hali yo‘q", "debt:dismiss:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📅 Muddatni uzaytirish", "debt:extend:" + debt.getId()))
-                    ))
-                    .build();
-
+            InlineKeyboardMarkup kb = inlineKeyboardFactory.getBorrowedReminderKeyboard(debt.getId());
             sendAndLog(user, debt, typeSlot, today, msg, kb);
         } else {
             // LENT hours: 09:00, 14:00, 19:00
@@ -198,24 +178,16 @@ public class DebtReminderService {
             }
 
             String msg = String.format(
-                    "🤝 <b>Bugun qarz qaytarilish kuni</b>\n\n" +
-                    "👤 <b>%s</b>\n" +
-                    "💰 <b>%s</b>\n\n" +
-                    "Qarzingiz qaytarildimi?\n\n" +
+                    "🤝 <b>Bugun %sning qarzni qaytarish kuni.</b>\n\n" +
+                    "💰 <b>Qolgan qarzi:</b>\n%s\n\n" +
+                    "Qarz qaytdimi?\n\n" +
                     "%s",
                     debt.getPersonName(),
-                    MoneyFormatter.format(debt.getAmount()),
+                    MoneyFormatter.format(debt.getRemainingAmount()),
                     DebtHadithCatalog.getLentRespiteHadith()
             );
 
-            InlineKeyboardMarkup kb = InlineKeyboardMarkup.builder()
-                    .inlineKeyboard(List.of(
-                            List.of(new InlineKeyboardButton("✅ Qaytarib oldim", "debt:pay:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("⏰ Hali yo‘q", "debt:dismiss:" + debt.getId())),
-                            List.of(new InlineKeyboardButton("📅 Muddat berish", "debt:extend:" + debt.getId()))
-                    ))
-                    .build();
-
+            InlineKeyboardMarkup kb = inlineKeyboardFactory.getLentReminderKeyboard(debt.getId());
             sendAndLog(user, debt, typeSlot, today, msg, kb);
         }
     }

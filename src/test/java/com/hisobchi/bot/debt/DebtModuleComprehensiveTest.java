@@ -27,6 +27,12 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import com.hisobchi.bot.common.exception.ValidationException;
+import com.hisobchi.bot.debt.entity.DebtPayment;
+import com.hisobchi.bot.debt.entity.DebtPaymentType;
+import com.hisobchi.bot.debt.repository.DebtPaymentRepository;
+import com.hisobchi.bot.user.service.BalanceService;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -39,6 +45,12 @@ class DebtModuleComprehensiveTest {
 
     @Mock
     private DebtReminderLogRepository reminderLogRepository;
+
+    @Mock
+    private DebtPaymentRepository debtPaymentRepository;
+
+    @Mock
+    private BalanceService balanceService;
 
     @Mock
     private TransactionRepository transactionRepository;
@@ -153,11 +165,88 @@ class DebtModuleComprehensiveTest {
     @Test
     @DisplayName("Test 6: '2 haftadan keyin' produces dueDate = currentDate + 14 days")
     void testTwoWeeksAfterParsing() {
-        LocalDate today = LocalDate.of(2026, 10, 1);
+        LocalDate today = LocalDate.now(zoneId);
         Optional<LocalDate> parsed = dateParser.parseDate("2 haftadan keyin", zoneId);
 
         assertTrue(parsed.isPresent());
         LocalDate expected = today.plusDays(14);
         assertEquals(expected, parsed.get());
+    }
+
+    @Test
+    @DisplayName("Test 7: makePartialPayment updates remainingAmount, paidAmount and saves DebtPayment")
+    void testPartialPaymentUpdatesDebt() {
+        User user = User.builder().id(1L).telegramId(111L).build();
+        Debt debt = Debt.builder()
+                .id(40L)
+                .user(user)
+                .type(DebtType.BORROWED)
+                .personName("Akmal")
+                .originalAmount(new BigDecimal("1500000"))
+                .amount(new BigDecimal("1500000"))
+                .paidAmount(BigDecimal.ZERO)
+                .remainingAmount(new BigDecimal("1500000"))
+                .status(DebtStatus.ACTIVE)
+                .build();
+
+        when(debtRepository.findByIdAndUserId(40L, 1L)).thenReturn(Optional.of(debt));
+        when(debtPaymentRepository.save(any(DebtPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DebtPayment payment = debtService.makePartialPayment(40L, 1L, new BigDecimal("500000"), "Naqd", TransactionSource.MANUAL);
+
+        assertNotNull(payment);
+        assertEquals(new BigDecimal("500000"), payment.getAmount());
+        assertEquals(new BigDecimal("500000"), debt.getPaidAmount());
+        assertEquals(new BigDecimal("1000000"), debt.getRemainingAmount());
+        assertEquals(DebtStatus.ACTIVE, debt.getStatus());
+        verify(balanceService).applyDebtPayment(user, new BigDecimal("500000"), "Naqd");
+    }
+
+    @Test
+    @DisplayName("Test 8: Full payment sets status to PAID and sets closedAt")
+    void testFullPaymentTransitionsToPaid() {
+        User user = User.builder().id(1L).telegramId(111L).build();
+        Debt debt = Debt.builder()
+                .id(50L)
+                .user(user)
+                .type(DebtType.BORROWED)
+                .personName("Rustam")
+                .originalAmount(new BigDecimal("1000000"))
+                .amount(new BigDecimal("1000000"))
+                .paidAmount(BigDecimal.ZERO)
+                .remainingAmount(new BigDecimal("1000000"))
+                .status(DebtStatus.ACTIVE)
+                .build();
+
+        when(debtRepository.findByIdAndUserId(50L, 1L)).thenReturn(Optional.of(debt));
+        when(debtPaymentRepository.save(any(DebtPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DebtPayment payment = debtService.makeFullPayment(50L, 1L, "Karta", TransactionSource.MANUAL);
+
+        assertNotNull(payment);
+        assertEquals(new BigDecimal("1000000"), debt.getPaidAmount());
+        assertEquals(BigDecimal.ZERO, debt.getRemainingAmount());
+        assertEquals(DebtStatus.PAID, debt.getStatus());
+        assertNotNull(debt.getClosedAt());
+        verify(balanceService).applyDebtPayment(user, new BigDecimal("1000000"), "Karta");
+    }
+
+    @Test
+    @DisplayName("Test 9: Paying more than remaining amount throws ValidationException")
+    void testOverpaymentThrowsException() {
+        User user = User.builder().id(1L).telegramId(111L).build();
+        Debt debt = Debt.builder()
+                .id(60L)
+                .user(user)
+                .type(DebtType.BORROWED)
+                .remainingAmount(new BigDecimal("500000"))
+                .status(DebtStatus.ACTIVE)
+                .build();
+
+        when(debtRepository.findByIdAndUserId(60L, 1L)).thenReturn(Optional.of(debt));
+
+        assertThrows(ValidationException.class, () ->
+                debtService.makePartialPayment(60L, 1L, new BigDecimal("600000"), "Naqd", TransactionSource.MANUAL)
+        );
     }
 }

@@ -1,5 +1,6 @@
 package com.hisobchi.bot.ai.service;
 
+import com.hisobchi.bot.ai.dto.DebtIntent;
 import com.hisobchi.bot.ai.dto.ParsedDebt;
 import com.hisobchi.bot.common.util.UzbekDateParser;
 import com.hisobchi.bot.debt.entity.DebtType;
@@ -23,9 +24,15 @@ public class DebtNlpService {
     private final UzbekDateParser dateParser;
 
     // Pattern to capture person name with Uzbek case endings (-dan, -ga, -ka, -qa):
-    // "Rustam akadan", "Akmal akadan", "Javlonga", "Boburdan", "Sherzodga"
-    private static final Pattern PERSON_PATTERN = Pattern.compile(
+    // "Rustam akadan", "Akmal akadan", "Rustamga", "Rustam akaga", "Javlonga", "Boburdan"
+    private static final Pattern PERSON_SUFFIX_PATTERN = Pattern.compile(
             "\\b([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)(?:dan|ga|ka|qa)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    // Pattern to capture leading subject person in return phrases: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
+    private static final Pattern LEADING_PERSON_PATTERN = Pattern.compile(
+            "^([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
@@ -36,74 +43,153 @@ public class DebtNlpService {
 
         String lower = text.toLowerCase().trim();
 
-        // 1. Debt Intent check
-        boolean hasDebtWord = lower.contains("qarz") || lower.contains("qarzga");
-        boolean hasBorrowedVerb = lower.contains("oldim") || lower.contains("berishim kerak") || lower.contains("beraman") || lower.contains("qaytaraman");
-        boolean hasLentVerb = lower.contains("berdim") || lower.contains("qaytaradi") || lower.contains("beradi") || lower.contains("berishi kerak");
+        // Check if message is related to debt
+        boolean hasDebtWord = lower.contains("qarz") || lower.contains("qarzga") || lower.contains("qarzim") || lower.contains("qarzini");
+        boolean hasReturnWord = lower.contains("qaytardi") || lower.contains("qaytdi") || lower.contains("qaytardim");
+        boolean hasBorrowVerb = lower.contains("oldim") || lower.contains("berishim kerak") || lower.contains("beraman");
+        boolean hasLentVerb = lower.contains("berdim") || lower.contains("beradi") || lower.contains("berishi kerak");
 
-        // Must have debt indicator
-        if (!hasDebtWord && !(hasBorrowedVerb && lower.matches(".*(?:dan|ga).*")) && !(hasLentVerb && lower.matches(".*(?:ga|qa|ka).*"))) {
+        if (!hasDebtWord && !hasReturnWord && !hasBorrowVerb && !hasLentVerb) {
             return Optional.empty();
         }
 
-        // 2. Determine DebtType: BORROWED vs LENT
-        DebtType type;
-        if (lower.contains("qarz oldim") || (lower.contains("oldim") && !lower.contains("qarz berdim"))) {
-            type = DebtType.BORROWED;
-        } else if (lower.contains("qarz berdim") || lower.contains("berdim") || lower.contains("qaytaradi")) {
-            type = DebtType.LENT;
-        } else if (lower.contains("berishim kerak") || lower.contains("qaytaraman")) {
-            type = DebtType.BORROWED;
-        } else {
-            type = DebtType.BORROWED;
+        // Determine Intent
+        DebtIntent intent = detectIntent(lower);
+        if (intent == null) {
+            return Optional.empty();
         }
 
-        // 3. Amount extraction
+        DebtType type = (intent == DebtIntent.BORROW || intent == DebtIntent.REPAY_PARTIAL || intent == DebtIntent.REPAY_FULL)
+                ? DebtType.BORROWED
+                : DebtType.LENT;
+
+        // Amount extraction
         Optional<BigDecimal> amountOpt = amountParser.parse(text);
-        if (amountOpt.isEmpty()) {
-            log.debug("Debt intent detected but amount missing in: '{}'", text);
+        BigDecimal amount = amountOpt.orElse(null);
+
+        // If intent requires amount and amount is missing, but not a FULL repayment/return
+        if (amount == null && intent != DebtIntent.REPAY_FULL && intent != DebtIntent.RETURN_FULL) {
+            // Could still be a debt creation where amount is missing, but if amount is completely absent and no full keyword, return empty
             return Optional.empty();
         }
-        BigDecimal amount = amountOpt.get();
 
-        // 4. Person name extraction
-        String personName = "Noma'lum";
-        Matcher personMatcher = PERSON_PATTERN.matcher(text);
-        while (personMatcher.find()) {
-            String candidate = personMatcher.group(1).trim();
-            // Filter out common non-name words that end in -dan/-ga
-            String candLower = candidate.toLowerCase();
-            if (!candLower.matches(".*(?:bugun|kecha|ertalab|kechqurun|oy|hafta|karta|naqd|bank|bozor|dokon|magazin|zapravka|taksi|tushlik|obed).*")) {
-                personName = capitalizeWords(candidate);
-                break;
-            }
-        }
+        // Person extraction
+        String personName = extractPersonName(text, lower, intent);
+        boolean missingPerson = personName == null || personName.isBlank() || "Noma'lum".equalsIgnoreCase(personName);
 
-        // 5. Due date extraction
+        // Due date extraction
         Optional<LocalDate> dueDateOpt = dateParser.parseDate(text, zoneId);
         LocalDate dueDate = dueDateOpt.orElse(null);
+        boolean missingDueDate = (dueDate == null && (intent == DebtIntent.BORROW || intent == DebtIntent.LEND));
 
-        // 6. Payment method extraction
-        String paymentMethod = "Naqd";
+        // Payment method extraction
+        String paymentMethod = null;
         if (lower.contains("karta") || lower.contains("kartadan") || lower.contains("plastik") || lower.contains("hisob raqam")) {
             paymentMethod = "Karta";
+        } else if (lower.contains("naqd") || lower.contains("qo'lga") || lower.contains("qolga")) {
+            paymentMethod = "Naqd";
         }
+        boolean missingPaymentMethod = (paymentMethod == null);
 
-        double confidence = (dueDate != null && !"Noma'lum".equals(personName)) ? 0.95 : 0.80;
+        double confidence = 0.80;
+        if (!missingPerson) confidence += 0.10;
+        if (amount != null || intent == DebtIntent.REPAY_FULL || intent == DebtIntent.RETURN_FULL) confidence += 0.05;
 
-        log.info("Parsed debt from text: type={}, amount={}, person={}, dueDate={}, paymentMethod={}",
-                type, amount, personName, dueDate, paymentMethod);
+        log.info("Parsed debt NLP: intent={}, type={}, amount={}, person={}, dueDate={}, missingPerson={}, missingDueDate={}, missingMethod={}",
+                intent, type, amount, personName, dueDate, missingPerson, missingDueDate, missingPaymentMethod);
 
         return Optional.of(new ParsedDebt(
+                intent,
                 type,
                 amount,
-                personName,
+                personName != null ? personName : "Noma'lum",
                 dueDate,
                 text.trim(),
                 confidence,
                 text.trim(),
-                paymentMethod
+                paymentMethod != null ? paymentMethod : "Naqd",
+                missingPerson,
+                missingDueDate,
+                missingPaymentMethod
         ));
+    }
+
+    private DebtIntent detectIntent(String lower) {
+        // 1. Full debt repayment: "Rustam akaga qarzimni hammasini berdim", "qarzimni hammasini to'ladim"
+        if ((lower.contains("hammasini berdim") || lower.contains("hammasini to'ladim") || lower.contains("hammasini toladim")
+                || lower.contains("qarzimni yopdim") || lower.contains("to'liq to'ladim") || lower.contains("toliq toladim")
+                || lower.contains("barchasini berdim")) && (lower.contains("qarz") || lower.contains("berdim") || lower.contains("to'ladim") || lower.contains("toladim"))) {
+            return DebtIntent.REPAY_FULL;
+        }
+
+        // 2. Full debt return by other person: "Javlon hamma qarzini qaytardi", "Javlon qarzini hammasini qaytardi"
+        if ((lower.contains("hammasini qaytardi") || lower.contains("hamma qarzini qaytardi") || lower.contains("to'liq qaytardi")
+                || lower.contains("toliq qaytardi") || lower.contains("barchasini qaytardi")) && (lower.contains("qarz") || lower.contains("qaytardi"))) {
+            return DebtIntent.RETURN_FULL;
+        }
+
+        // 3. Partial repayment of user's debt: "Rustam akaga qarzimdan 500 ming berdim", "qarzimdan 200 ming to'ladim"
+        if (lower.contains("qarzimdan") || lower.contains("qarzimga") || lower.contains("qarzga berdim")
+                || (lower.contains("qarz") && (lower.contains("to'ladim") || lower.contains("toladim")))
+                || (lower.contains("qarzim") && lower.contains("berdim"))) {
+            return DebtIntent.REPAY_PARTIAL;
+        }
+
+        // 4. Return from other person: "Javlon 600 ming qarz qaytardi", "Javlon 600 ming qarzini qaytardi", "qarz qaytardi", "qarz qaytdi"
+        if (lower.contains("qarz qaytardi") || lower.contains("qarzini qaytardi") || lower.contains("qarz qaytdi")
+                || (lower.contains("qaytardi") && lower.contains("qarz")) || (lower.contains("qaytarib berdi") && lower.contains("qarz"))) {
+            return DebtIntent.RETURN_PARTIAL;
+        }
+
+        // 5. Creating BORROWED debt: "qarz oldim", "Rustam akadan oldim", "oldim, beraman"
+        if (lower.contains("qarz oldim") || (lower.contains("oldim") && !lower.contains("qarz berdim"))) {
+            return DebtIntent.BORROW;
+        }
+
+        // 6. Creating LENT debt: "qarz berdim", "Sherzodga 3 million qarz berdim"
+        if (lower.contains("qarz berdim") || lower.contains("qarzga berdim") || (lower.contains("berdim") && !lower.contains("qarzimdan") && !lower.contains("hammasini"))) {
+            return DebtIntent.LEND;
+        }
+
+        // Fallbacks
+        if (lower.contains("berishim kerak") || lower.contains("qaytaraman")) {
+            return DebtIntent.BORROW;
+        }
+
+        if (lower.contains("qaytaradi") || lower.contains("berishi kerak")) {
+            return DebtIntent.LEND;
+        }
+
+        return null;
+    }
+
+    private String extractPersonName(String text, String lower, DebtIntent intent) {
+        // 1. Suffix match: "Rustam akadan", "Rustam akaga", "Rustamga"
+        Matcher suffixMatcher = PERSON_SUFFIX_PATTERN.matcher(text);
+        while (suffixMatcher.find()) {
+            String candidate = suffixMatcher.group(1).trim();
+            String candLower = candidate.toLowerCase();
+            if (!isFilteredWord(candLower)) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        // 2. Leading person subject: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
+        Matcher leadMatcher = LEADING_PERSON_PATTERN.matcher(text);
+        if (leadMatcher.find()) {
+            String candidate = leadMatcher.group(1).trim();
+            String candLower = candidate.toLowerCase();
+            if (!isFilteredWord(candLower)) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isFilteredWord(String word) {
+        if (word == null || word.isBlank()) return true;
+        return word.matches(".*(?:bugun|kecha|ertalab|kechqurun|oy|hafta|karta|kartadan|naqd|bank|bozor|dokon|magazin|zapravka|taksi|tushlik|obed|qarz|qarzim|qarzini|hamma|hammasi|barcha|barchasi|men|menga|sendan|undan|bizdan).*");
     }
 
     private String capitalizeWords(String input) {

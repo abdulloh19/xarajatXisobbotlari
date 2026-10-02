@@ -60,6 +60,7 @@ public class DebtDraftService {
                 .rawText(rawText)
                 .confidence(confidence)
                 .paymentMethod(paymentMethod != null && !paymentMethod.isBlank() ? paymentMethod : "Naqd")
+                .initialPaymentMethod(paymentMethod != null && !paymentMethod.isBlank() ? paymentMethod : "Naqd")
                 .borrowedOrLentDate(borrowedOrLentDate != null ? borrowedOrLentDate : LocalDate.now())
                 .expiresAt(Instant.now().plus(DRAFT_TTL))
                 .build();

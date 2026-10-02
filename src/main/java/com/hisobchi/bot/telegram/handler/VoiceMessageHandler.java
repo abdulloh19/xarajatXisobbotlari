@@ -36,6 +36,8 @@ public class VoiceMessageHandler {
     private final com.hisobchi.bot.ai.service.DebtNlpService debtNlpService;
     private final com.hisobchi.bot.debt.service.DebtDraftService debtDraftService;
 
+    private final com.hisobchi.bot.telegram.handler.DebtNlpHandler debtNlpHandler;
+
     public void handle(User user, Message message) {
         Long chatId = message.getChat().getId();
         Voice voice = message.getVoice();
@@ -64,13 +66,7 @@ public class VoiceMessageHandler {
         java.time.ZoneId zoneId = java.time.ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "Asia/Tashkent");
         java.util.Optional<com.hisobchi.bot.ai.dto.ParsedDebt> debtOpt = debtNlpService.parse(transcribedText, zoneId);
         if (debtOpt.isPresent()) {
-            com.hisobchi.bot.ai.dto.ParsedDebt d = debtOpt.get();
-            com.hisobchi.bot.debt.entity.DebtDraft debtDraft = debtDraftService.createDraft(
-                    user, d.type(), d.amount(), d.personName(), d.dueDate(), d.description(), transcribedText, d.confidence()
-            );
-            String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(debtDraft);
-            apiClient.sendMessage(chatId, confirmMsg,
-                    inlineKeyboardFactory.getDebtConfirmationKeyboard(debtDraft.getId()), "HTML");
+            debtNlpHandler.handleParsedDebt(user, chatId, debtOpt.get(), transcribedText);
             return;
         }
 

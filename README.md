@@ -35,6 +35,10 @@ U foydalanuvchiga kunlik xarajat va daromadlarni oddiy matn, menyu tugmalari yok
     - `LENT`: 2 kun qolganda va muddat kuni (09:00, 14:00, 19:00 da) muloyim eslatma (Sahih Muslim 1563a muddat berish fazilati hadisi bilan). `✅ Qaytarib oldim` bosilgach status `RECEIVED` bo'ladi.
     - `OVERDUE`: Muddati o'tgan qarzlarni avtomatik aniqlash va kuniga 1 marta muloyim eslatish.
   - **Muddatni uzaytirish:** Yangi sanani matn orqali kiritish va tasdiqlash (`debt:conf_ext`).
+  - **Qisman va to‘liq to‘lovlar (Partial & Full Payments):** Qarzni bo‘lib-bo‘lib to‘lash yoki to‘liq yopish imkoniyati. Qolgan summa (`remaining_amount`) va to‘langan qism (`paid_amount`) doimiy kuzatiladi.
+  - **To‘lovlar tarixi (Debt Payments History):** Har bir to‘lov miqdori, usuli (`Naqd`/`Karta`), sanasi va manbasi bilan `debt_payments` da saqlanadi.
+  - **Kassa va karta balansi (User Balances):** Qarz olinganda, berilganda yoki to‘langanda foydalanuvchining kassa/karta qoldig‘i (`user_balances`) avtomatik to‘g‘rilanadi.
+  - **Ovozli va matnli NLP orqali to‘lov:** *"Rustam akaga qarzimdan 500 ming berdim"*, *"Rustam akaga qarzimni hammasini to'ladim"*, *"Javlon hamma qarzini qaytardi"* kabi iboralarni to‘liq tushunish.
   - **Qat'iy moliyaviy ajralish (Section 81):** Qarzlar kundalik taksi sof foydasi, xarajati va daromadi hisob-kitobiga aralashmaydi!
 - 📈 **Sof foyda va statistikalar:**
   - Bugungi, haftalik va oylik batafsil hisobotlar (PostgreSQL agregatsiyalari bilan, N+1 muammosisiz).
@@ -53,11 +57,11 @@ U foydalanuvchiga kunlik xarajat va daromadlarni oddiy matn, menyu tugmalari yok
 - **Spring Boot 3.3.4**
 - **Spring Data JPA & Hibernate**
 - **PostgreSQL 16+**
-- **Flyway Database Migrations** (11 ta to'liq migratsiya)
+- **Flyway Database Migrations** (12 ta to'liq migratsiya)
 - **Telegram Bot API** (Toza, yuqori unumdor REST Client)
 - **OpenAI Whisper STT & Built-in Voice Engine**
 - **Lombok**
-- **JUnit 5 & Mockito** (43 ta unit va integratsiya testlar)
+- **JUnit 5 & Mockito** (50 ta unit va integratsiya testlar)
 - **Docker & Docker Compose**
 
 ---

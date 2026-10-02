@@ -13,6 +13,7 @@ import com.hisobchi.bot.transaction.entity.TransactionType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public final class BotMessageBuilder {
@@ -223,32 +224,24 @@ public final class BotMessageBuilder {
 
     public static String buildDebtDraftConfirmationMessage(com.hisobchi.bot.debt.entity.DebtDraft draft) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🤝 <b>QARZNI TEKSHIRING</b>\n\n");
-
         boolean isBorrowed = draft.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
-        if (isBorrowed) {
-            sb.append("🔴 <b>Siz qarz oldingiz</b>\n\n");
-        } else {
-            sb.append("🟢 <b>Siz qarz berdingiz</b>\n\n");
-        }
-
-        sb.append("💰 <b>Summa:</b>\n").append(MoneyFormatter.format(draft.getAmount())).append("\n\n");
+        java.time.format.DateTimeFormatter dFmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         if (isBorrowed) {
+            sb.append("🔴 <b>QARZ OLDINGIZ</b>\n\n");
             sb.append("👤 <b>Kimdan:</b>\n").append(escapeHtml(draft.getPersonName())).append("\n\n");
-            sb.append("📅 <b>Olingan sana:</b>\n").append(draft.getBorrowedOrLentDate() != null ? draft.getBorrowedOrLentDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) : "Bugun").append("\n\n");
+            sb.append("💰 <b>Summa:</b>\n").append(MoneyFormatter.format(draft.getAmount())).append("\n\n");
+            sb.append("📅 <b>Qaytarish:</b>\n")
+                    .append(draft.getDueDate() != null ? draft.getDueDate().format(dFmt) : "<i>Belgilanmagan</i>").append("\n\n");
+            sb.append("💳 <b>To‘lov turi:</b>\n").append(draft.getPaymentMethod() != null ? draft.getPaymentMethod() : "Naqd").append("\n\n");
         } else {
+            sb.append("🤝 <b>QARZ BERISH</b>\n\n");
             sb.append("👤 <b>Kimga:</b>\n").append(escapeHtml(draft.getPersonName())).append("\n\n");
-            sb.append("📅 <b>Berilgan sana:</b>\n").append(draft.getBorrowedOrLentDate() != null ? draft.getBorrowedOrLentDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy")) : "Bugun").append("\n\n");
+            sb.append("💰 <b>Summa:</b>\n").append(MoneyFormatter.format(draft.getAmount())).append("\n\n");
+            sb.append("📅 <b>Qaytarish sanasi:</b>\n")
+                    .append(draft.getDueDate() != null ? draft.getDueDate().format(dFmt) : "<i>Belgilanmagan</i>").append("\n\n");
+            sb.append("💵 <b>To‘lov turi:</b>\n").append(draft.getPaymentMethod() != null ? draft.getPaymentMethod() : "Naqd").append("\n\n");
         }
-
-        if (draft.getDueDate() != null) {
-            sb.append("⏰ <b>Qaytarish sanasi:</b>\n").append(draft.getDueDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("\n\n");
-        } else {
-            sb.append("⏰ <b>Qaytarish sanasi:</b>\n<i>Belgilanmagan</i>\n\n");
-        }
-
-        sb.append("💳 <b>Pul turi:</b>\n").append(draft.getPaymentMethod() != null ? draft.getPaymentMethod() : "Naqd").append("\n\n");
 
         sb.append("<b>Saqlaymizmi?</b>");
         return sb.toString();
@@ -271,12 +264,11 @@ public final class BotMessageBuilder {
             int i = 1;
             for (com.hisobchi.bot.debt.entity.Debt d : borrowed) {
                 sb.append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
-                sb.append(MoneyFormatter.format(d.getAmount())).append("\n");
+                sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
                 if (d.getDueDate() != null) {
                     long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
                     String daysText = days < 0 ? "⚠️ Muddati o‘tgan!" : (days == 0 ? "⚠️ Bugun to‘lash kuni!" : days + " kun qoldi");
-                    sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append("\n");
-                    sb.append(daysText).append("\n");
+                    sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append(" (").append(daysText).append(")\n");
                 }
                 sb.append("👉 /debt_view_").append(d.getId()).append("\n\n");
             }
@@ -289,17 +281,44 @@ public final class BotMessageBuilder {
             int i = 1;
             for (com.hisobchi.bot.debt.entity.Debt d : lent) {
                 sb.append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
-                sb.append(MoneyFormatter.format(d.getAmount())).append("\n");
+                sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
                 if (d.getDueDate() != null) {
                     long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
                     String daysText = days < 0 ? "⚠️ Muddati o‘tgan!" : (days == 0 ? "🤝 Bugun qaytarish kuni!" : days + " kun qoldi");
-                    sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append("\n");
-                    sb.append(daysText).append("\n");
+                    sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append(" (").append(daysText).append(")\n");
                 }
                 sb.append("👉 /debt_view_").append(d.getId()).append("\n\n");
             }
         }
 
+        return sb.toString();
+    }
+
+    public static String buildActiveDebtsList(List<com.hisobchi.bot.debt.entity.Debt> debts, com.hisobchi.bot.debt.entity.DebtType type) {
+        StringBuilder sb = new StringBuilder();
+        boolean isBorrowed = type == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
+        sb.append(isBorrowed ? "🔴 <b>MEN OLGAN QARZLAR</b>\n" : "🟢 <b>MEN BERGAN QARZLAR</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        if (debts == null || debts.isEmpty()) {
+            sb.append(isBorrowed ? "<i>Olingan faol qarzlar yo‘q</i>\n" : "<i>Berilgan faol qarzlar yo‘q</i>\n");
+            return sb.toString();
+        }
+
+        LocalDate today = LocalDate.now();
+        DateTimeFormatter shortFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+        int i = 1;
+        for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+            sb.append(i++).append(". 👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
+            sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
+            if (d.getDueDate() != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
+                String daysText = days < 0 ? "⚠️ Muddati o‘tgan!" : (days == 0 ? "🤝 Bugun qaytarish kuni!" : days + " kun qoldi");
+                sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append(" (").append(daysText).append(")\n");
+            }
+            sb.append("👉 /debt_view_").append(d.getId()).append("\n\n");
+        }
         return sb.toString();
     }
 
@@ -318,7 +337,7 @@ public final class BotMessageBuilder {
             String icon = d.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED ? "🔴" : "🟢";
             String status = d.getStatus() == com.hisobchi.bot.debt.entity.DebtStatus.PAID ? "To‘langan" : "Qaytarib olingan";
             sb.append(icon).append(" ").append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b> — ")
-                    .append(MoneyFormatter.format(d.getAmount()))
+                    .append(MoneyFormatter.format(d.getOriginalAmount()))
                     .append(" (<i>").append(status).append("</i>)\n");
         }
         return sb.toString();
@@ -326,49 +345,69 @@ public final class BotMessageBuilder {
 
     public static String buildDebtDetailMessage(com.hisobchi.bot.debt.entity.Debt d) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🤝 <b>QARZ MA’LUMOTI</b>\n\n");
+        sb.append("🤝 <b>QARZ MA’LUMOTI</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
-        if (d.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED) {
+        boolean isBorrowed = d.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
+        sb.append("👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>\n\n");
+
+        if (isBorrowed) {
             sb.append("🔴 <b>Siz qarz olgansiz</b>\n\n");
-            sb.append("👤 <b>Kimdan:</b> ").append(escapeHtml(d.getPersonName())).append("\n");
         } else {
             sb.append("🟢 <b>Siz qarz bergansiz</b>\n\n");
-            sb.append("👤 <b>Kimga:</b> ").append(escapeHtml(d.getPersonName())).append("\n");
         }
 
-        sb.append("💰 <b>Summa:</b> ").append(MoneyFormatter.format(d.getAmount())).append("\n\n");
+        sb.append("💰 <b>Boshlang‘ich qarz:</b>\n")
+                .append(MoneyFormatter.format(d.getOriginalAmount())).append("\n\n");
+
+        sb.append("✅ <b>To‘langan:</b>\n")
+                .append(MoneyFormatter.format(d.getPaidAmount())).append("\n\n");
+
+        sb.append(isBorrowed ? "🔴" : "🟢").append(" <b>Qolgan:</b>\n")
+                .append(MoneyFormatter.format(d.getRemainingAmount())).append("\n\n");
 
         java.time.format.DateTimeFormatter dFmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
-        if (d.getBorrowedOrLentDate() != null) {
-            sb.append("📅 <b>Sana:</b> ").append(d.getBorrowedOrLentDate().format(dFmt)).append("\n");
-        }
         if (d.getDueDate() != null) {
-            sb.append("⏰ <b>Qaytarish:</b> ").append(d.getDueDate().format(dFmt)).append("\n");
-            long days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), d.getDueDate());
-            if (days < 0) {
-                sb.append("⏳ <b>Holat:</b> ⚠️ Muddati o‘tgan (").append(Math.abs(days)).append(" kun oldin)\n");
-            } else if (days == 0) {
-                sb.append("⏳ <b>Holat:</b> ⚠️ Bugun qaytarish kuni!\n");
-            } else {
-                sb.append("⏳ <b>Qoldi:</b> ").append(days).append(" kun\n");
-            }
+            sb.append("📅 <b>Qaytarish:</b>\n").append(d.getDueDate().format(dFmt)).append("\n\n");
         }
 
-        sb.append("💳 <b>Pul turi:</b> ").append(d.getPaymentMethod() != null ? d.getPaymentMethod() : "Naqd").append("\n");
-
-        String statusStr = switch (d.getStatus()) {
-            case ACTIVE -> "Faol";
-            case PAID -> "✅ To‘langan";
-            case RECEIVED -> "✅ Qaytarib olingan";
-            case OVERDUE -> "⚠️ Muddati o‘tgan";
-            case CANCELLED -> "Bekor qilingan";
-        };
-        sb.append("📌 <b>Status:</b> ").append(statusStr).append("\n");
+        String methodLabel = isBorrowed ? "💳 <b>Olingan:</b> " : "💵 <b>Berilgan:</b> ";
+        sb.append(methodLabel).append(d.getPaymentMethod() != null ? d.getPaymentMethod() : "Naqd").append("\n");
 
         if (d.getDescription() != null && !d.getDescription().isBlank()) {
-            sb.append("📝 <b>Izoh:</b> <i>").append(escapeHtml(d.getDescription())).append("</i>\n");
+            sb.append("\n📝 <b>Izoh:</b> <i>").append(escapeHtml(d.getDescription())).append("</i>\n");
         }
 
+        return sb.toString();
+    }
+
+    public static String buildDebtDetailPage(com.hisobchi.bot.debt.entity.Debt d) {
+        return buildDebtDetailMessage(d);
+    }
+
+    public static String buildPaymentHistoryMessage(com.hisobchi.bot.debt.entity.Debt debt, List<com.hisobchi.bot.debt.entity.DebtPayment> payments) {
+        StringBuilder sb = new StringBuilder();
+        boolean isBorrowed = debt.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
+        sb.append("📜 <b>TO‘LOVLAR TARIXI</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        sb.append("👤 <b>").append(escapeHtml(debt.getPersonName())).append("</b>\n");
+        sb.append("💰 Jami qarz: <b>").append(MoneyFormatter.format(debt.getOriginalAmount())).append("</b>\n");
+        sb.append("✅ To‘langan: <b>").append(MoneyFormatter.format(debt.getPaidAmount())).append("</b>\n");
+        sb.append(isBorrowed ? "🔴" : "🟢").append(" Qolgan: <b>").append(MoneyFormatter.format(debt.getRemainingAmount())).append("</b>\n\n");
+
+        if (payments == null || payments.isEmpty()) {
+            sb.append("<i>Hozircha to‘lovlar amalga oshirilmagan.</i>\n");
+            return sb.toString();
+        }
+
+        DateTimeFormatter dFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+        int i = 1;
+        for (com.hisobchi.bot.debt.entity.DebtPayment p : payments) {
+            String date = p.getPaymentDate() != null ? p.getPaymentDate().format(dFmt) : "";
+            sb.append(i++).append(". 📅 ").append(date)
+                    .append(" — <b>").append(MoneyFormatter.format(p.getAmount())).append("</b>")
+                    .append(" (<i>").append(p.getPaymentMethod() != null ? p.getPaymentMethod() : "Naqd").append("</i>)\n");
+        }
         return sb.toString();
     }
 
@@ -377,18 +416,73 @@ public final class BotMessageBuilder {
         sb.append("🤝 <b>QARZLAR HISOBOTI</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
-        sb.append("🔴 <b>Siz to‘lashingiz kerak:</b>\n")
-                .append(MoneyFormatter.format(stats.totalToPay())).append("\n\n");
-
-        sb.append("🟢 <b>Sizga qaytarilishi kerak:</b>\n")
-                .append(MoneyFormatter.format(stats.totalToReceive())).append("\n\n");
+        sb.append("🔴 <b>MENING QARZLARIM</b>\n\n");
+        sb.append("Boshlang‘ich:\n<b>").append(MoneyFormatter.format(stats.borrowedOriginal())).append("</b>\n\n");
+        sb.append("To‘langan:\n<b>").append(MoneyFormatter.format(stats.borrowedPaid())).append("</b>\n\n");
+        sb.append("Qolgan:\n<b>").append(MoneyFormatter.format(stats.borrowedRemaining())).append("</b>\n\n");
 
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
-        sb.append("🔴 <b>Faol olingan qarz:</b> ").append(stats.activeBorrowedCount()).append(" ta\n");
-        sb.append("🟢 <b>Faol berilgan qarz:</b> ").append(stats.activeLentCount()).append(" ta\n");
-        sb.append("⚠️ <b>Muddati o‘tgan:</b> ").append(stats.overdueCount()).append(" ta\n");
+        sb.append("🟢 <b>MEN BERGAN QARZLAR</b>\n\n");
+        sb.append("Berilgan:\n<b>").append(MoneyFormatter.format(stats.lentOriginal())).append("</b>\n\n");
+        sb.append("Qaytgan:\n<b>").append(MoneyFormatter.format(stats.lentPaid())).append("</b>\n\n");
+        sb.append("Boshqalarda qolgan:\n<b>").append(MoneyFormatter.format(stats.lentRemaining())).append("</b>\n");
 
+        return sb.toString();
+    }
+
+    public static String buildDebtPaymentHistoryMessage(com.hisobchi.bot.debt.entity.Debt debt, List<com.hisobchi.bot.debt.entity.DebtPayment> payments) {
+        StringBuilder sb = new StringBuilder();
+        boolean isBorrowed = debt.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
+        String title = isBorrowed ? "TO‘LOVLAR TARIXI" : "QAYTARISHLAR TARIXI";
+        sb.append("📜 <b>").append(title).append("</b>\n");
+        sb.append("👤 <b>").append(escapeHtml(debt.getPersonName())).append("</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        if (payments == null || payments.isEmpty()) {
+            sb.append("<i>To‘lovlar tarixi mavjud emas.</i>\n\n");
+        } else {
+            java.time.format.DateTimeFormatter dFmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
+            int i = 1;
+            for (com.hisobchi.bot.debt.entity.DebtPayment p : payments) {
+                sb.append(i++).append(". <b>").append(MoneyFormatter.format(p.getAmount())).append("</b> ")
+                        .append("(").append(p.getPaymentMethod()).append(") — ")
+                        .append(p.getPaymentDate() != null ? p.getPaymentDate().format(dFmt) : "").append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("💰 Boshlang‘ich: <b>").append(MoneyFormatter.format(debt.getOriginalAmount())).append("</b>\n");
+        sb.append("✅ Jami to‘langan: <b>").append(MoneyFormatter.format(debt.getPaidAmount())).append("</b>\n");
+        sb.append(isBorrowed ? "🔴" : "🟢").append(" Qolgan qarz: <b>").append(MoneyFormatter.format(debt.getRemainingAmount())).append("</b>\n");
+        return sb.toString();
+    }
+
+    public static String buildNearDueDebtsMessage(List<com.hisobchi.bot.debt.entity.Debt> debts) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("⚠️ <b>MUDDATI YAQIN QARZLAR</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        if (debts == null || debts.isEmpty()) {
+            sb.append("<i>Yaqin kunlarda muddati keladigan qarzlar yo‘q.</i>\n");
+            return sb.toString();
+        }
+
+        LocalDate today = LocalDate.now();
+        java.time.format.DateTimeFormatter shortFmt = java.time.format.DateTimeFormatter.ofPattern("d-MMMM", java.util.Locale.forLanguageTag("uz-UZ"));
+
+        int i = 1;
+        for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+            String icon = d.getType() == com.hisobchi.bot.debt.entity.DebtType.BORROWED ? "🔴" : "🟢";
+            sb.append(icon).append(" ").append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
+            sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
+            if (d.getDueDate() != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
+                String daysText = days < 0 ? "⚠️ Muddati o‘tgan!" : (days == 0 ? "⚠️ Bugun qaytarish kuni!" : days + " kun qoldi");
+                sb.append("⏰ ").append(d.getDueDate().format(shortFmt)).append(" (").append(daysText).append(")\n");
+            }
+            sb.append("👉 /debt_view_").append(d.getId()).append("\n\n");
+        }
         return sb.toString();
     }
 

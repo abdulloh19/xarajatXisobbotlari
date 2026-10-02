@@ -16,6 +16,7 @@ import com.hisobchi.bot.debt.entity.Debt;
 import com.hisobchi.bot.debt.entity.DebtDraft;
 import com.hisobchi.bot.debt.entity.DebtType;
 import com.hisobchi.bot.debt.service.DebtDraftService;
+import com.hisobchi.bot.debt.service.DebtFlowService;
 import com.hisobchi.bot.debt.service.DebtService;
 import com.hisobchi.bot.notification.entity.NotificationSettings;
 import com.hisobchi.bot.notification.service.NotificationSettingsService;
@@ -74,6 +75,9 @@ public class TextMessageHandler {
     private final TransactionRepository transactionRepository;
     private final ReplyKeyboardFactory replyKeyboardFactory;
     private final InlineKeyboardFactory inlineKeyboardFactory;
+    private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
+    private final DebtNlpHandler debtNlpHandler;
+    private final com.hisobchi.bot.user.service.BalanceService balanceService;
 
     // Temporary multi-step state storage per user
     private final ConcurrentHashMap<Long, BigDecimal> userCashProfits = new ConcurrentHashMap<>();
@@ -86,6 +90,17 @@ public class TextMessageHandler {
 
     public void setExtendingDebtId(Long userId, Long debtId) {
         userExtendingDebtId.put(userId, debtId);
+    }
+
+    public BigDecimal removeUserDebtAmount(Long userId) { return userDebtAmounts.remove(userId); }
+    public String removeUserDebtPerson(Long userId) { return userDebtPersons.remove(userId); }
+    public LocalDate removeUserDebtDate(Long userId) { return userDebtDates.remove(userId); }
+    public DebtType removeUserDebtType(Long userId) { return userDebtTypes.remove(userId); }
+    public void clearUserDebtCreation(Long userId) {
+        userDebtAmounts.remove(userId);
+        userDebtPersons.remove(userId);
+        userDebtDates.remove(userId);
+        userDebtTypes.remove(userId);
     }
 
     public void handle(User user, com.hisobchi.bot.telegram.client.model.TelegramModels.Message message) {
@@ -231,20 +246,60 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, overview, replyKeyboardFactory.getDebtsMenu(), "HTML");
                 return;
             }
-            case "💵 Qarz oldim" -> {
+            case "💰 Qarz oldim", "💵 Qarz oldim" -> {
                 userDebtTypes.put(user.getId(), DebtType.BORROWED);
-                userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_AMOUNT);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_BORROW_PERSON);
                 apiClient.sendMessage(chatId,
-                        "💰 <b>Qancha qarz oldingiz?</b>\n\nMasalan:\n<code>1500000</code>\nyoki\n<code>1 500 000</code>\nyoki\n<code>1.5 million</code>",
+                        "👤 <b>Kimdan qarz oldingiz?</b>\n\nMasalan:\n<i>Rustam aka</i>",
                         replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
-            case "💰 Qarz berdim" -> {
+            case "💸 Qarz berdim", "💰 Qarz berdim" -> {
                 userDebtTypes.put(user.getId(), DebtType.LENT);
-                userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_AMOUNT);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_LENT_PERSON);
                 apiClient.sendMessage(chatId,
-                        "💰 <b>Qancha qarz berdingiz?</b>\n\nMasalan:\n<code>2000000</code>\nyoki\n<code>2 000 000</code>\nyoki\n<code>2 million</code>",
+                        "👤 <b>Kimga qarz berdingiz?</b>\n\nMasalan:\n<i>Rustam aka</i>",
                         replyKeyboardFactory.getCancelMenu(), "HTML");
+                return;
+            }
+            case "💳 Qarz to‘lash" -> {
+                List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
+                if (borrowed.isEmpty()) {
+                    apiClient.sendMessage(chatId, "✅ Sizda to‘lanishi kerak bo‘lgan qarzlar yo‘q.", replyKeyboardFactory.getDebtsMenu(), null);
+                    return;
+                }
+                var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                apiClient.sendMessage(chatId, "Kimga qarz to‘lamoqchisiz?",
+                        inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
+                return;
+            }
+            case "💵 Qarz qaytardi" -> {
+                List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
+                if (lent.isEmpty()) {
+                    apiClient.sendMessage(chatId, "✅ Siz bergan faol qarzlar mavjud emas.", replyKeyboardFactory.getDebtsMenu(), null);
+                    return;
+                }
+                var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                apiClient.sendMessage(chatId, "Kim qarz qaytardi?",
+                        inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
+                return;
+            }
+            case "📋 Men olgan qarzlar" -> {
+                List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
+                String msg = BotMessageBuilder.buildActiveDebtsList(borrowed, DebtType.BORROWED);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
+                return;
+            }
+            case "📋 Men bergan qarzlar" -> {
+                List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
+                String msg = BotMessageBuilder.buildActiveDebtsList(lent, DebtType.LENT);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
+                return;
+            }
+            case "⚠️ Muddati yaqin" -> {
+                List<Debt> nearDue = debtService.getNearDueDebts(user.getId(), 3);
+                String msg = BotMessageBuilder.buildNearDueDebtsMessage(nearDue);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
                 return;
             }
             case "📋 Faol qarzlar" -> {
@@ -313,7 +368,7 @@ public class TextMessageHandler {
             case "📅 Bugun" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 ReportData report = reportService.getDailyReportData(user.getId(), today);
-                String msg = reportService.formatDailyReport(report);
+                String msg = reportService.formatDailyReport(report, user.getId());
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
@@ -413,6 +468,195 @@ public class TextMessageHandler {
 
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+            }
+            case WAITING_LENT_PERSON -> {
+                userDebtPersons.put(user.getId(), text.trim());
+                userDebtTypes.put(user.getId(), DebtType.LENT);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_LENT_AMOUNT);
+                apiClient.sendMessage(chatId, "💰 <b>Qancha berdingiz?</b>\n\nMasalan:\n<code>2500000</code>", replyKeyboardFactory.getCancelMenu(), "HTML");
+            }
+            case WAITING_LENT_AMOUNT -> {
+                Optional<BigDecimal> amtOpt = amountParser.parse(text);
+                if (amtOpt.isEmpty() || amtOpt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ To‘g‘ri summa kiriting (masalan: <code>2500000</code>):", replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                userDebtAmounts.put(user.getId(), amtOpt.get());
+                userService.updateState(user.getTelegramId(), UserState.WAITING_LENT_DATE);
+                apiClient.sendMessage(chatId, "📅 <b>Qachongacha qaytarishi kerak?</b>\n\nMasalan:\n<code>10 oktabr</code>\n<code>keyingi juma</code>\n<code>ertaga</code>\n\n(yoki <i>'O‘tkazib yuborish'</i> deb yozing)", replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
+            }
+            case WAITING_LENT_DATE -> {
+                LocalDate dueDate = null;
+                if (!"⏭ O‘tkazib yuborish".equalsIgnoreCase(text) && !"o‘tkazib yuborish".equalsIgnoreCase(text)) {
+                    ZoneId zoneId = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "Asia/Tashkent");
+                    dueDate = dateParser.parseDate(text, zoneId).orElse(null);
+                }
+                userDebtDates.put(user.getId(), dueDate);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, "Pulni qanday berdingiz?", inlineKeyboardFactory.getDebtCreationPaymentMethodKeyboard(), null);
+            }
+            case WAITING_BORROW_PERSON -> {
+                userDebtPersons.put(user.getId(), text.trim());
+                userDebtTypes.put(user.getId(), DebtType.BORROWED);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_BORROW_AMOUNT);
+                apiClient.sendMessage(chatId, "💰 <b>Qancha oldingiz?</b>\n\nMasalan:\n<code>2500000</code>", replyKeyboardFactory.getCancelMenu(), "HTML");
+            }
+            case WAITING_BORROW_AMOUNT -> {
+                Optional<BigDecimal> amtOpt = amountParser.parse(text);
+                if (amtOpt.isEmpty() || amtOpt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ To‘g‘ri summa kiriting (masalan: <code>2500000</code>):", replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                userDebtAmounts.put(user.getId(), amtOpt.get());
+                userService.updateState(user.getTelegramId(), UserState.WAITING_BORROW_DATE);
+                apiClient.sendMessage(chatId, "📅 <b>Qachon qaytarishingiz kerak?</b>\n\nMasalan:\n<code>10 oktabr</code>\n<code>keyingi haftaga</code>\n<code>ertaga</code>\n\n(yoki <i>'O‘tkazib yuborish'</i> deb yozing)", replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
+            }
+            case WAITING_BORROW_DATE -> {
+                LocalDate dueDate = null;
+                if (!"⏭ O‘tkazib yuborish".equalsIgnoreCase(text) && !"o‘tkazib yuborish".equalsIgnoreCase(text)) {
+                    ZoneId zoneId = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "Asia/Tashkent");
+                    dueDate = dateParser.parseDate(text, zoneId).orElse(null);
+                }
+                userDebtDates.put(user.getId(), dueDate);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, "Pulni qanday oldingiz?", inlineKeyboardFactory.getDebtCreationPaymentMethodKeyboard(), null);
+            }
+            case WAITING_DEBT_PAY_AMOUNT -> {
+                var session = debtFlowService.getSession(user.getId());
+                if (session == null || session.getDebtId() == null) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+                Optional<BigDecimal> amtOpt = amountParser.parse(text);
+                if (amtOpt.isEmpty() || amtOpt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ To‘g‘ri summa kiriting (masalan: <code>500000</code>):", replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                BigDecimal amt = amtOpt.get();
+                var debtOpt = debtService.getDebt(session.getDebtId(), user.getId());
+                if (debtOpt.isEmpty()) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Qarz topilmadi.", replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+                Debt debt = debtOpt.get();
+                if (amt.compareTo(debt.getRemainingAmount()) > 0) {
+                    String warnMsg = String.format("""
+                            ⚠️ <b>%sga qolgan qarzingiz:</b>
+                            %s
+
+                            Siz:
+                            <b>%s</b>
+
+                            kiritdingiz.
+
+                            Qolgan qarzdan ko‘p summa kiritib bo‘lmaydi.
+                            """,
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()),
+                            MoneyFormatter.format(amt)
+                    );
+                    apiClient.sendMessage(chatId, warnMsg,
+                            inlineKeyboardFactory.getOverpaymentBlockKeyboard(debt.getId(), debt.getRemainingAmount(), "debt_pay", true),
+                            "HTML");
+                    return;
+                }
+                session.setPaymentAmount(amt);
+                session.setFull(amt.compareTo(debt.getRemainingAmount()) == 0);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, "Pul qayerdan beriladi?",
+                        inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debt.getId(), "debt_pay"), null);
+            }
+            case WAITING_DEBT_RETURN_AMOUNT -> {
+                var session = debtFlowService.getSession(user.getId());
+                if (session == null || session.getDebtId() == null) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+                Optional<BigDecimal> amtOpt = amountParser.parse(text);
+                if (amtOpt.isEmpty() || amtOpt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ To‘g‘ri summa kiriting (masalan: <code>600000</code>):", replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                BigDecimal amt = amtOpt.get();
+                var debtOpt = debtService.getDebt(session.getDebtId(), user.getId());
+                if (debtOpt.isEmpty()) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Qarz topilmadi.", replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+                Debt debt = debtOpt.get();
+                if (amt.compareTo(debt.getRemainingAmount()) > 0) {
+                    String warnMsg = String.format("""
+                            ⚠️ <b>%sning qolgan qarzi:</b>
+                            %s
+
+                            Siz:
+                            <b>%s</b>
+
+                            kiritdingiz.
+
+                            Qolgan qarzdan ko‘p summa kiritib bo‘lmaydi.
+                            """,
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()),
+                            MoneyFormatter.format(amt)
+                    );
+                    apiClient.sendMessage(chatId, warnMsg,
+                            inlineKeyboardFactory.getOverpaymentBlockKeyboard(debt.getId(), debt.getRemainingAmount(), "debt_ret", false),
+                            "HTML");
+                    return;
+                }
+                session.setPaymentAmount(amt);
+                session.setFull(amt.compareTo(debt.getRemainingAmount()) == 0);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, "Pulni qanday qaytardi?",
+                        inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debt.getId(), "debt_ret"), null);
+            }
+            case WAITING_VOICE_DEBT_PERSON -> {
+                var session = debtFlowService.getSession(user.getId());
+                if (session != null) {
+                    session.setPersonName(text.trim());
+                    if (session.getDueDate() == null) {
+                        userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_DATE);
+                        apiClient.sendMessage(chatId, "📅 <b>Qachongacha qaytarishi kerak?</b>\n\nMasalan:\n<code>10 oktabr</code>\n<code>keyingi juma</code>\n(yoki <i>'O‘tkazib yuborish'</i> deb yozing)", replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
+                    } else {
+                        DebtType type = session.getFlowType() == DebtFlowService.FlowType.RETURN_LENT ? DebtType.LENT : DebtType.BORROWED;
+                        userDebtTypes.put(user.getId(), type);
+                        userDebtAmounts.put(user.getId(), session.getPaymentAmount());
+                        userDebtPersons.put(user.getId(), session.getPersonName());
+                        userDebtDates.put(user.getId(), session.getDueDate());
+                        debtFlowService.clearSession(user.getId());
+                        userService.updateState(user.getTelegramId(), UserState.IDLE);
+                        apiClient.sendMessage(chatId, "Pulni qanday " + (type == DebtType.BORROWED ? "oldingiz?" : "berdingiz?"), inlineKeyboardFactory.getDebtCreationPaymentMethodKeyboard(), null);
+                    }
+                } else {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                }
+            }
+            case WAITING_VOICE_DEBT_DATE -> {
+                var session = debtFlowService.getSession(user.getId());
+                if (session != null) {
+                    LocalDate dueDate = null;
+                    if (!"⏭ O‘tkazib yuborish".equalsIgnoreCase(text) && !"o‘tkazib yuborish".equalsIgnoreCase(text)) {
+                        ZoneId zoneId = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "Asia/Tashkent");
+                        dueDate = dateParser.parseDate(text, zoneId).orElse(null);
+                    }
+                    DebtType type = session.getFlowType() == DebtFlowService.FlowType.RETURN_LENT ? DebtType.LENT : DebtType.BORROWED;
+                    userDebtTypes.put(user.getId(), type);
+                    userDebtAmounts.put(user.getId(), session.getPaymentAmount());
+                    userDebtPersons.put(user.getId(), session.getPersonName());
+                    userDebtDates.put(user.getId(), dueDate);
+                    debtFlowService.clearSession(user.getId());
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Pulni qanday " + (type == DebtType.BORROWED ? "oldingiz?" : "berdingiz?"), inlineKeyboardFactory.getDebtCreationPaymentMethodKeyboard(), null);
+                } else {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                }
             }
             case WAITING_DEBT_AMOUNT -> {
                 Optional<BigDecimal> amountOpt = amountParser.parse(text);
@@ -645,13 +889,7 @@ public class TextMessageHandler {
         // 1. Check if natural text is a debt message
         Optional<ParsedDebt> debtOpt = debtNlpService.parse(text, zoneId);
         if (debtOpt.isPresent()) {
-            ParsedDebt d = debtOpt.get();
-            DebtDraft draft = debtDraftService.createDraft(
-                    user, d.type(), d.amount(), d.personName(), d.dueDate(), d.description(), text, d.confidence()
-            );
-            String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
-            apiClient.sendMessage(chatId, confirmMsg,
-                    inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+            debtNlpHandler.handleParsedDebt(user, chatId, debtOpt.get(), text);
             return;
         }
 

@@ -38,6 +38,16 @@ public class Debt {
     @Column(name = "amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "original_amount", precision = 19, scale = 2)
+    private BigDecimal originalAmount;
+
+    @Column(name = "paid_amount", precision = 19, scale = 2)
+    @Builder.Default
+    private BigDecimal paidAmount = BigDecimal.ZERO;
+
+    @Column(name = "remaining_amount", precision = 19, scale = 2)
+    private BigDecimal remainingAmount;
+
     @Column(name = "currency", length = 10)
     @Builder.Default
     private String currency = "UZS";
@@ -46,9 +56,17 @@ public class Debt {
     @Builder.Default
     private String paymentMethod = "Naqd";
 
+    @Column(name = "initial_payment_method", length = 20)
+    @Builder.Default
+    private String initialPaymentMethod = "Naqd";
+
     @Column(name = "borrowed_or_lent_date")
     @Builder.Default
     private LocalDate borrowedOrLentDate = LocalDate.now();
+
+    @Column(name = "start_date")
+    @Builder.Default
+    private LocalDate startDate = LocalDate.now();
 
     @Column(name = "due_date")
     private LocalDate dueDate;
@@ -82,4 +100,55 @@ public class Debt {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.originalAmount == null && this.amount != null) {
+            this.originalAmount = this.amount;
+        } else if (this.amount == null && this.originalAmount != null) {
+            this.amount = this.originalAmount;
+        }
+        if (this.paidAmount == null) {
+            this.paidAmount = BigDecimal.ZERO;
+        }
+        if (this.remainingAmount == null) {
+            this.remainingAmount = this.originalAmount != null ? this.originalAmount.subtract(this.paidAmount) : BigDecimal.ZERO;
+        }
+        if (this.initialPaymentMethod == null) {
+            this.initialPaymentMethod = this.paymentMethod;
+        }
+        if (this.startDate == null) {
+            this.startDate = this.borrowedOrLentDate != null ? this.borrowedOrLentDate : LocalDate.now();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        if (this.originalAmount == null && this.amount != null) {
+            this.originalAmount = this.amount;
+        } else if (this.amount == null && this.originalAmount != null) {
+            this.amount = this.originalAmount;
+        }
+        if (this.paidAmount == null) {
+            this.paidAmount = BigDecimal.ZERO;
+        }
+        if (this.remainingAmount == null && this.originalAmount != null) {
+            this.remainingAmount = this.originalAmount.subtract(this.paidAmount);
+        }
+    }
+
+    public BigDecimal getOriginalAmount() {
+        return originalAmount != null ? originalAmount : amount;
+    }
+
+    public BigDecimal getPaidAmount() {
+        return paidAmount != null ? paidAmount : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getRemainingAmount() {
+        if (remainingAmount != null) return remainingAmount;
+        BigDecimal orig = getOriginalAmount();
+        BigDecimal paid = getPaidAmount();
+        return orig != null ? orig.subtract(paid) : BigDecimal.ZERO;
+    }
 }

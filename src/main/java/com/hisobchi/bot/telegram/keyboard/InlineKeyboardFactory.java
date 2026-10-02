@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class InlineKeyboardFactory {
@@ -155,44 +156,282 @@ public class InlineKeyboardFactory {
                                 new InlineKeyboardButton("✅ Saqlash", "debt:save:" + draftId)
                         ),
                         List.of(
-                                new InlineKeyboardButton("💰 Summani o‘zgartirish", "debt:edit_field:" + draftId + ":amount"),
-                                new InlineKeyboardButton("👤 Ismni o‘zgartirish", "debt:edit_field:" + draftId + ":person")
+                                new InlineKeyboardButton("✏️ Tahrirlash", "debt:edit_ask:" + draftId)
                         ),
                         List.of(
-                                new InlineKeyboardButton("📅 Sanani o‘zgartirish", "debt:edit_field:" + draftId + ":date"),
                                 new InlineKeyboardButton("❌ Bekor qilish", "debt:cancel:" + draftId)
                         )
                 ))
                 .build();
     }
 
-    public InlineKeyboardMarkup getDebtActionKeyboard(Debt debt) {
-        String resolveText = debt.getType() == DebtType.BORROWED ? "✅ To‘ladim" : "✅ Qaytarib oldim";
-        String extendText = debt.getType() == DebtType.BORROWED ? "📅 Muddatni o‘zgartirish" : "📅 Muddatni uzaytirish";
+    public InlineKeyboardMarkup getDebtCreateMethodKeyboard() {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton(resolveText, "debt:pay:" + debt.getId()),
-                                new InlineKeyboardButton(extendText, "debt:extend:" + debt.getId())
+                                new InlineKeyboardButton("💵 Naqd", "debt_create:method:cash"),
+                                new InlineKeyboardButton("💳 Karta", "debt_create:method:card")
                         ),
                         List.of(
-                                new InlineKeyboardButton("🗑 O‘chirish", "debt:del:" + debt.getId()),
-                                new InlineKeyboardButton("⬅️ Orqaga", "debt:back")
+                                new InlineKeyboardButton("❌ Bekor qilish", "debt:cancel_create")
                         )
                 ))
                 .build();
+    }
+
+    public InlineKeyboardMarkup getDebtCreateEditFieldsKeyboard(Long draftId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💰 Summani o‘zgartirish", "debt:edit_field:" + draftId + ":amount"),
+                                new InlineKeyboardButton("👤 Ismni o‘zgartirish", "debt:edit_field:" + draftId + ":person")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("📅 Sanani o‘zgartirish", "debt:edit_field:" + draftId + ":date"),
+                                new InlineKeyboardButton("💳 Pul turini o‘zgartirish", "debt:edit_field:" + draftId + ":method")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("⬅️ Orqaga", "debt:edit_back:" + draftId),
+                                new InlineKeyboardButton("❌ Bekor qilish", "debt:cancel:" + draftId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtSelectionKeyboard(List<Debt> debts, String prefix) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (Debt d : debts) {
+            String label = "👤 " + d.getPersonName() + " — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(d.getRemainingAmount()) + " qoldi";
+            rows.add(List.of(new InlineKeyboardButton(label, prefix + ":select:" + d.getId())));
+        }
+        rows.add(List.of(new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getDebtGroupedSelectionKeyboard(Map<String, List<Debt>> grouped, String prefix) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (Map.Entry<String, List<Debt>> entry : grouped.entrySet()) {
+            String person = entry.getKey();
+            List<Debt> pDebts = entry.getValue();
+            if (pDebts.size() == 1) {
+                Debt d = pDebts.get(0);
+                String label = "👤 " + d.getPersonName() + " — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(d.getRemainingAmount()) + " qoldi";
+                rows.add(List.of(new InlineKeyboardButton(label, prefix + ":select:" + d.getId())));
+            } else {
+                java.math.BigDecimal total = pDebts.stream()
+                        .map(Debt::getRemainingAmount)
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                String label = "👤 " + person + " — jami " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(total);
+                rows.add(List.of(new InlineKeyboardButton(label, prefix + ":person:" + person)));
+            }
+        }
+        rows.add(List.of(new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getDebtSubSelectionKeyboard(List<Debt> debts, String prefix) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM");
+        for (Debt d : debts) {
+            String dateStr = d.getDueDate() != null ? d.getDueDate().format(fmt) : (d.getStartDate() != null ? d.getStartDate().format(fmt) : "");
+            String label = "📅 " + dateStr + " — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(d.getRemainingAmount()) + " qoldi";
+            rows.add(List.of(new InlineKeyboardButton(label, prefix + ":select:" + d.getId())));
+        }
+        rows.add(List.of(new InlineKeyboardButton("⬅️ Orqaga", prefix + ":back_persons")));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getDebtAmountChoiceKeyboard(Long debtId, java.math.BigDecimal remaining, String prefix) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💯 Hammasini — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(remaining), prefix + ":full:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("✍️ Boshqa summa", prefix + ":custom:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("⬅️ Orqaga", prefix + ":back")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtPaymentMethodSelectionKeyboard(Long debtId, String prefix) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💵 Naqd", prefix + ":method:" + debtId + ":cash"),
+                                new InlineKeyboardButton("💳 Karta", prefix + ":method:" + debtId + ":card")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("⬅️ Orqaga", prefix + ":back_amt:" + debtId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtCreationPaymentMethodKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💵 Naqd", "debt_create:method:cash"),
+                                new InlineKeyboardButton("💳 Karta", "debt_create:method:card")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "debt:cancel_create")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtPaymentConfirmationKeyboard(Long debtId, String prefix, boolean isPay) {
+        String confirmText = isPay ? "✅ To‘lash" : "✅ Saqlash";
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton(confirmText, prefix + ":confirm:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("✏️ Summani o‘zgartirish", prefix + ":custom:" + debtId),
+                                new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtFullPaymentConfirmationKeyboard(Long debtId, String prefix, boolean isPay) {
+        String confirmText = isPay ? "✅ Ha, to‘lash" : "✅ Ha, qabul qilindi";
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton(confirmText, prefix + ":confirm_full:" + debtId),
+                                new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getOverpaymentBlockKeyboard(Long debtId, java.math.BigDecimal remaining, String prefix, boolean isPay) {
+        String fullBtn = isPay ? "💯 " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(remaining) + " ni to‘lash"
+                               : "💯 " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(remaining) + " ni qaytarish";
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton(fullBtn, prefix + ":full:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("✏️ Boshqa summa", prefix + ":custom:" + debtId),
+                                new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDebtActionKeyboard(Debt debt) {
+        if (debt.getType() == DebtType.BORROWED) {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("💳 Qarz to‘lash", "debt_pay:start:" + debt.getId()),
+                                    new InlineKeyboardButton("💯 To‘liq yopish", "debt_pay:full_start:" + debt.getId())
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Muddatni o‘zgartirish", "debt:extend:" + debt.getId()),
+                                    new InlineKeyboardButton("📜 To‘lovlar tarixi", "debt:history:" + debt.getId())
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Tahrirlash", "debt:edit_ask:" + debt.getId()),
+                                    new InlineKeyboardButton("⬅️ Orqaga", "debt:back")
+                            )
+                    ))
+                    .build();
+        } else {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("💵 Qarz qaytardi", "debt_ret:start:" + debt.getId()),
+                                    new InlineKeyboardButton("💯 To‘liq qaytardi", "debt_ret:full_start:" + debt.getId())
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Muddatni uzaytirish", "debt:extend:" + debt.getId()),
+                                    new InlineKeyboardButton("📜 Qaytarishlar tarixi", "debt:history:" + debt.getId())
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Tahrirlash", "debt:edit_ask:" + debt.getId()),
+                                    new InlineKeyboardButton("⬅️ Orqaga", "debt:back")
+                            )
+                    ))
+                    .build();
+        }
+    }
+
+    public InlineKeyboardMarkup getDebtDetailPageKeyboard(Debt debt) {
+        return getDebtActionKeyboard(debt);
     }
 
     public InlineKeyboardMarkup getDebtActionKeyboard(Long debtId) {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("✅ Qaytarildi / Yopish", "debt:pay:" + debtId),
+                                new InlineKeyboardButton("💳 Qarz to‘lash / qaytarish", "debt_pay:start:" + debtId),
                                 new InlineKeyboardButton("📅 Muddatni uzaytirish", "debt:extend:" + debtId)
                         ),
                         List.of(
-                                new InlineKeyboardButton("🗑 O‘chirish", "debt:del:" + debtId),
+                                new InlineKeyboardButton("📜 To‘lovlar tarixi", "debt:history:" + debtId),
                                 new InlineKeyboardButton("⬅️ Orqaga", "debt:back")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getBorrowedReminderKeyboard(Long debtId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💯 Hammasini to‘ladim", "debt_pay:full_start:" + debtId),
+                                new InlineKeyboardButton("💳 Qisman to‘ladim", "debt_pay:start:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("⏰ Hali yo‘q", "debt:dismiss:" + debtId),
+                                new InlineKeyboardButton("📅 Muddatni o‘zgartirish", "debt:extend:" + debtId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getLentReminderKeyboard(Long debtId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💯 Hammasini qaytardi", "debt_ret:full_start:" + debtId),
+                                new InlineKeyboardButton("💵 Qisman qaytardi", "debt_ret:start:" + debtId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("⏰ Hali qaytmadi", "debt:dismiss:" + debtId),
+                                new InlineKeyboardButton("📅 Muddat berish", "debt:extend:" + debtId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getVoiceFullRepayKeyboard(Long debtId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("✅ Ha, hammasini to‘ladim", "debt_voice:pay_full:" + debtId),
+                                new InlineKeyboardButton("❌ Yo‘q", "debt_voice:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getVoiceFullReturnKeyboard(Long debtId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("✅ Ha, hammasini qaytardi", "debt_voice:ret_full:" + debtId),
+                                new InlineKeyboardButton("❌ Yo‘q", "debt_voice:cancel")
                         )
                 ))
                 .build();

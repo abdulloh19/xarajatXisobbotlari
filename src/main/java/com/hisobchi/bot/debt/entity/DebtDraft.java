@@ -40,6 +40,10 @@ public class DebtDraft {
     @Builder.Default
     private String paymentMethod = "Naqd";
 
+    @Column(name = "initial_payment_method", length = 20)
+    @Builder.Default
+    private String initialPaymentMethod = "Naqd";
+
     @Column(name = "borrowed_or_lent_date")
     @Builder.Default
     private LocalDate borrowedOrLentDate = LocalDate.now();

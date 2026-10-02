@@ -19,6 +19,7 @@ import java.util.Optional;
 public class DailyProfitService {
 
     private final DailyProfitRepository dailyProfitRepository;
+    private final com.hisobchi.bot.user.service.BalanceService balanceService;
 
     @Transactional
     public DailyProfit saveOrUpdateProfit(User user, LocalDate date, BigDecimal cash, BigDecimal card) {
@@ -32,11 +33,17 @@ public class DailyProfitService {
                         .profitDate(date)
                         .build());
 
+        BigDecimal oldCash = record.getCashAmount() != null ? record.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal oldCard = record.getCardAmount() != null ? record.getCardAmount() : BigDecimal.ZERO;
+        BigDecimal deltaCash = safeCash.subtract(oldCash);
+        BigDecimal deltaCard = safeCard.subtract(oldCard);
+
         record.setCashAmount(safeCash);
         record.setCardAmount(safeCard);
         record.setTotalProfit(total);
 
         DailyProfit saved = dailyProfitRepository.save(record);
+        balanceService.updateDailyProfitDelta(user, deltaCash, deltaCard);
         log.info("Saved daily profit for user {} on {}: cash={}, card={}, total={}",
                 user.getId(), date, safeCash, safeCard, total);
         return saved;

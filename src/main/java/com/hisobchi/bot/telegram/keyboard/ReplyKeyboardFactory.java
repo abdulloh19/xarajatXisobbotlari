@@ -71,11 +71,19 @@ public class ReplyKeyboardFactory {
                 .resizeKeyboard(true)
                 .keyboard(List.of(
                         List.of(
-                                new KeyboardButton("💵 Qarz oldim"),
-                                new KeyboardButton("💰 Qarz berdim")
+                                new KeyboardButton("💰 Qarz oldim"),
+                                new KeyboardButton("💸 Qarz berdim")
                         ),
                         List.of(
-                                new KeyboardButton("📋 Faol qarzlar"),
+                                new KeyboardButton("💳 Qarz to‘lash"),
+                                new KeyboardButton("💵 Qarz qaytardi")
+                        ),
+                        List.of(
+                                new KeyboardButton("📋 Men olgan qarzlar"),
+                                new KeyboardButton("📋 Men bergan qarzlar")
+                        ),
+                        List.of(
+                                new KeyboardButton("⚠️ Muddati yaqin"),
                                 new KeyboardButton("✅ Yopilgan qarzlar")
                         ),
                         List.of(

@@ -69,4 +69,56 @@ class DebtNlpServiceTest {
         assertEquals("Akmal Aka", debt.personName());
         assertEquals(LocalDate.now(zoneId).plusDays(3), debt.dueDate());
     }
+
+    @Test
+    @DisplayName("Parse full repayment: 'Rustam akaga qarzimni hammasini to''ladim'")
+    void testParseRepayFull() {
+        String text = "Rustam akaga qarzimni hammasini to'ladim";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(com.hisobchi.bot.ai.dto.DebtIntent.REPAY_FULL, debt.intent());
+        assertEquals("Rustam Aka", debt.personName());
+        assertEquals(DebtType.BORROWED, debt.type());
+    }
+
+    @Test
+    @DisplayName("Parse full return: 'Javlon hamma qarzini qaytardi'")
+    void testParseReturnFull() {
+        String text = "Javlon hamma qarzini qaytardi";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(com.hisobchi.bot.ai.dto.DebtIntent.RETURN_FULL, debt.intent());
+        assertEquals("Javlon", debt.personName());
+        assertEquals(DebtType.LENT, debt.type());
+    }
+
+    @Test
+    @DisplayName("Parse partial repayment: 'Rustam akaga qarzimdan 500 ming berdim'")
+    void testParseRepayPartial() {
+        String text = "Rustam akaga qarzimdan 500 ming berdim";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(com.hisobchi.bot.ai.dto.DebtIntent.REPAY_PARTIAL, debt.intent());
+        assertEquals("Rustam Aka", debt.personName());
+        assertEquals(new BigDecimal("500000"), debt.amount());
+    }
+
+    @Test
+    @DisplayName("Parse partial return: 'Javlon 600 ming qarz qaytardi'")
+    void testParseReturnPartial() {
+        String text = "Javlon 600 ming qarz qaytardi";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(com.hisobchi.bot.ai.dto.DebtIntent.RETURN_PARTIAL, debt.intent());
+        assertEquals("Javlon", debt.personName());
+        assertEquals(new BigDecimal("600000"), debt.amount());
+    }
 }

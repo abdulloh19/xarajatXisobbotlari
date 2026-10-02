@@ -26,6 +26,9 @@ public class ReportService {
 
     private final TransactionRepository transactionRepository;
     private final DailyProfitService dailyProfitService;
+    private final com.hisobchi.bot.debt.repository.DebtRepository debtRepository;
+    private final com.hisobchi.bot.debt.repository.DebtPaymentRepository debtPaymentRepository;
+    private final com.hisobchi.bot.user.service.BalanceService balanceService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d-MMMM yyyy", new Locale("uz"));
     private static final DateTimeFormatter SHORT_DATE_FMT = DateTimeFormatter.ofPattern("d-MMMM", new Locale("uz"));
@@ -162,6 +165,79 @@ public class ReportService {
         if (data.categoryExpenses().isEmpty()) {
             sb.append("<i>Xarajatlar mavjud emas</i>\n");
         } else {
+            for (CategoryExpenseDto c : data.categoryExpenses()) {
+                sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
+                        .append(" — <b>").append(MoneyFormatter.format(c.totalAmount())).append("</b>\n");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    public String formatDailyReport(ReportData data, Long userId) {
+        StringBuilder sb = new StringBuilder();
+        if (!data.profitEntered()) {
+            sb.append(String.format(
+                    "⚠️ <b>Bugungi foyda hali kiritilmagan.</b>\n\n" +
+                    "💸 <b>Bugungi xarajat:</b>\n%s\n\n" +
+                    "💰 Jami ishlangan pulni hisoblash uchun foydani kiriting.\n\n",
+                    MoneyFormatter.format(data.totalExpense())
+            ));
+        } else {
+            sb.append("🚕 <b>BUGUNGI HISOBOT</b>\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+            sb.append("📅 <b>").append(data.periodStart().format(DATE_FMT)).append("</b>\n\n");
+            sb.append("💰 <b>Taksida ishladingiz:</b>\n").append(MoneyFormatter.format(data.totalEarned())).append("\n\n");
+            sb.append("💸 <b>Kundalik xarajat:</b>\n").append(MoneyFormatter.format(data.totalExpense())).append("\n\n");
+            sb.append("✅ <b>Ishdan qolgan foyda:</b>\n").append(MoneyFormatter.format(data.totalProfit())).append("\n\n");
+            sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(data.cashProfit())).append("\n");
+            sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
+        }
+
+        // Debt movements for today (Section 28)
+        LocalDate date = data.periodStart();
+        BigDecimal lentCreated = debtRepository.sumCreatedAmountByUserIdAndTypeAndDate(userId, com.hisobchi.bot.debt.entity.DebtType.LENT, date);
+        BigDecimal borrowedCreated = debtRepository.sumCreatedAmountByUserIdAndTypeAndDate(userId, com.hisobchi.bot.debt.entity.DebtType.BORROWED, date);
+        BigDecimal returnedReceived = debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDate(
+                userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_RETURN, date);
+        BigDecimal debtPaid = debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDate(
+                userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT, date);
+
+        boolean hasDebtMovements = (lentCreated != null && lentCreated.compareTo(BigDecimal.ZERO) > 0)
+                || (borrowedCreated != null && borrowedCreated.compareTo(BigDecimal.ZERO) > 0)
+                || (returnedReceived != null && returnedReceived.compareTo(BigDecimal.ZERO) > 0)
+                || (debtPaid != null && debtPaid.compareTo(BigDecimal.ZERO) > 0);
+
+        if (hasDebtMovements) {
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("🤝 <b>QARZ HARAKATLARI</b>\n\n");
+            if (lentCreated != null && lentCreated.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append("💸 <b>Qarzga berdingiz:</b>\n").append(MoneyFormatter.format(lentCreated)).append("\n\n");
+            }
+            if (borrowedCreated != null && borrowedCreated.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append("💰 <b>Qarz oldingiz:</b>\n").append(MoneyFormatter.format(borrowedCreated)).append("\n\n");
+            }
+            if (returnedReceived != null && returnedReceived.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append("💵 <b>Qarzdan qaytdi:</b>\n").append(MoneyFormatter.format(returnedReceived)).append("\n\n");
+            }
+            if (debtPaid != null && debtPaid.compareTo(BigDecimal.ZERO) > 0) {
+                sb.append("🔴 <b>Qarz to‘ladingiz:</b>\n").append(MoneyFormatter.format(debtPaid)).append("\n\n");
+            }
+        }
+
+        // Available real balance
+        var balanceOpt = balanceService.getBalance(userId);
+        if (balanceOpt.isPresent()) {
+            var b = balanceOpt.get();
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("💵 <b>Hozir naqd:</b> ").append(MoneyFormatter.format(b.getCashBalance())).append("\n");
+            sb.append("💳 <b>Hozir kartada:</b> ").append(MoneyFormatter.format(b.getCardBalance())).append("\n");
+            sb.append("💰 <b>Jami mavjud:</b> ").append(MoneyFormatter.format(b.getAvailableBalance())).append("\n\n");
+        }
+
+        if (!data.categoryExpenses().isEmpty()) {
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("📂 <b>Xarajatlar:</b>\n\n");
             for (CategoryExpenseDto c : data.categoryExpenses()) {
                 sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
                         .append(" — <b>").append(MoneyFormatter.format(c.totalAmount())).append("</b>\n");

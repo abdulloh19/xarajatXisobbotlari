@@ -7,8 +7,10 @@ import com.hisobchi.bot.common.exception.ValidationException;
 import com.hisobchi.bot.common.formatter.MoneyFormatter;
 import com.hisobchi.bot.common.util.DateTimeUtils;
 import com.hisobchi.bot.debt.entity.Debt;
+import com.hisobchi.bot.debt.entity.DebtDraft;
 import com.hisobchi.bot.debt.entity.DebtType;
 import com.hisobchi.bot.debt.service.DebtDraftService;
+import com.hisobchi.bot.debt.service.DebtFlowService;
 import com.hisobchi.bot.debt.service.DebtService;
 import com.hisobchi.bot.idempotency.service.IdempotencyService;
 import com.hisobchi.bot.notification.service.NotificationSettingsService;
@@ -24,6 +26,7 @@ import com.hisobchi.bot.transaction.dto.DraftDto;
 import com.hisobchi.bot.transaction.dto.TransactionDto;
 import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionDraft;
+import com.hisobchi.bot.transaction.entity.TransactionSource;
 import com.hisobchi.bot.transaction.entity.TransactionType;
 import com.hisobchi.bot.transaction.service.TransactionDraftService;
 import com.hisobchi.bot.transaction.service.TransactionService;
@@ -34,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -58,6 +62,8 @@ public class CallbackQueryHandler {
     private final NotificationSettingsService notificationSettingsService;
     private final ReportService reportService;
     private final TextMessageHandler textMessageHandler;
+    private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
+    private final com.hisobchi.bot.user.service.BalanceService balanceService;
 
     public void handle(User user, CallbackQuery callback) {
         String data = callback.getData();
@@ -78,6 +84,10 @@ public class CallbackQueryHandler {
             case "day" -> handleDayCallback(user, chatId, messageId, parts);
             case "tx" -> handleTransactionCallback(user, chatId, messageId, parts);
             case "debt" -> handleDebtCallback(user, chatId, messageId, parts);
+            case "debt_create" -> handleDebtCreateCallback(user, chatId, messageId, parts);
+            case "debt_pay" -> handleDebtPayCallback(user, chatId, messageId, parts);
+            case "debt_ret" -> handleDebtReturnCallback(user, chatId, messageId, parts);
+            case "debt_voice" -> handleDebtVoiceCallback(user, chatId, messageId, parts);
             case "notif" -> handleNotifCallback(user, chatId, messageId, parts);
             case "profit" -> handleProfitCallback(user, chatId, messageId, parts);
             case "reminder" -> handleReminderCallback(user, chatId, messageId, parts);
@@ -103,21 +113,49 @@ public class CallbackQueryHandler {
                 var draftOpt = debtDraftService.findValidDraft(id, user.getId());
                 if (draftOpt.isPresent()) {
                     Debt saved = debtService.saveFromDraft(draftOpt.get());
-                    String msg = String.format("""
-                            ✅ <b>Qarz saqlandi!</b>
+                    BigDecimal available = balanceService.getAvailableBalance(user.getId());
 
-                            %s
-                            💰 <b>%s</b>
-                            👤 <b>%s</b>
-                            💳 Pul turi: <b>%s</b>
-                            %s
-                            """,
-                            saved.getType() == DebtType.BORROWED ? "🔴 <b>Olingan qarz</b>" : "🟢 <b>Berilgan qarz</b>",
-                            MoneyFormatter.format(saved.getAmount()),
-                            BotMessageBuilder.escapeHtml(saved.getPersonName()),
-                            saved.getPaymentMethod(),
-                            saved.getDueDate() != null ? "📅 Muddati: " + saved.getDueDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) : ""
-                    );
+                    String msg;
+                    if (saved.getType() == DebtType.LENT) {
+                        msg = String.format("""
+                                ✅ <b>Qarz saqlandi</b>
+
+                                👤 <b>%s</b>
+                                💸 Qarz berdingiz:
+                                <b>%s</b>
+
+                                🤝 %sning qarzi:
+                                <b>%s</b>
+
+                                💰 Sizda hozir qoldi:
+                                <b>%s</b>
+                                """,
+                                BotMessageBuilder.escapeHtml(saved.getPersonName()),
+                                MoneyFormatter.format(saved.getAmount()),
+                                BotMessageBuilder.escapeHtml(saved.getPersonName()),
+                                MoneyFormatter.format(saved.getRemainingAmount()),
+                                MoneyFormatter.format(available)
+                        );
+                    } else {
+                        msg = String.format("""
+                                ✅ <b>Qarz saqlandi</b>
+
+                                👤 <b>%s</b>
+                                💰 Qarz oldingiz:
+                                <b>%s</b>
+
+                                🤝 Sizning qarzingiz:
+                                <b>%s</b>
+
+                                💰 Sizda hozir mavjud:
+                                <b>%s</b>
+                                """,
+                                BotMessageBuilder.escapeHtml(saved.getPersonName()),
+                                MoneyFormatter.format(saved.getAmount()),
+                                MoneyFormatter.format(saved.getRemainingAmount()),
+                                MoneyFormatter.format(available)
+                        );
+                    }
                     apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
                 } else {
                     apiClient.editMessageText(chatId, messageId, "⚠️ Qarz drafti topilmadi yoki muddati o‘tgan.", null, null);
@@ -126,6 +164,15 @@ public class CallbackQueryHandler {
             case "cancel" -> {
                 debtDraftService.deleteDraft(id);
                 apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+            }
+            case "history" -> {
+                var debtOpt = debtService.getDebt(id, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt d = debtOpt.get();
+                    var payments = debtService.getPaymentsForDebt(id, user.getId());
+                    String msg = BotMessageBuilder.buildPaymentHistoryMessage(d, payments);
+                    apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionKeyboard(d), "HTML");
+                }
             }
             case "pay" -> {
                 var debtOpt = debtService.getDebt(id, user.getId());
@@ -177,8 +224,8 @@ public class CallbackQueryHandler {
                 var debtOpt = debtService.getDebt(id, user.getId());
                 if (debtOpt.isPresent()) {
                     Debt d = debtOpt.get();
-                    String msg = BotMessageBuilder.buildDebtDetailMessage(d);
-                    apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionKeyboard(d), "HTML");
+                    String msg = BotMessageBuilder.buildDebtDetailPage(d);
+                    apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtDetailPageKeyboard(d), "HTML");
                 }
             }
             case "back" -> {
@@ -192,6 +239,21 @@ public class CallbackQueryHandler {
                 if (ok) {
                     apiClient.editMessageText(chatId, messageId, "🗑 <b>Qarz o‘chirildi.</b>", null, "HTML");
                 }
+            }
+            case "edit_ask" -> {
+                apiClient.editMessageText(chatId, messageId, "Qaysi maydonni tahrirlaysiz?",
+                        inlineKeyboardFactory.getDebtCreateEditFieldsKeyboard(id), null);
+            }
+            case "edit_back" -> {
+                debtDraftService.findValidDraft(id, user.getId()).ifPresent(d -> {
+                    String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(d);
+                    apiClient.editMessageText(chatId, messageId, confirmMsg,
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId()), "HTML");
+                });
+            }
+            case "cancel_create" -> {
+                textMessageHandler.clearUserDebtCreation(user.getId());
+                apiClient.editMessageText(chatId, messageId, "❌ Qarz yaratish bekor qilindi.", null, null);
             }
             case "edit_field" -> {
                 String field = parts[3];
@@ -211,6 +273,478 @@ public class CallbackQueryHandler {
                     }
                 }
             }
+        }
+    }
+
+    private void handleDebtCreateCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        if (parts.length < 3) return;
+        String action = parts[1];
+        if ("method".equals(action)) {
+            String methodKey = parts[2];
+            String paymentMethod = "card".equalsIgnoreCase(methodKey) ? "Karta" : "Naqd";
+            BigDecimal amount = textMessageHandler.removeUserDebtAmount(user.getId());
+            String person = textMessageHandler.removeUserDebtPerson(user.getId());
+            LocalDate dueDate = textMessageHandler.removeUserDebtDate(user.getId());
+            DebtType type = textMessageHandler.removeUserDebtType(user.getId());
+            if (type == null) type = DebtType.LENT;
+            if (amount == null) amount = BigDecimal.ZERO;
+            if (person == null) person = "Noma'lum";
+
+            DebtDraft draft = debtDraftService.createDraft(
+                    user, type, amount, person, dueDate, null, null, 1.0, paymentMethod, LocalDate.now()
+            );
+
+            String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
+            apiClient.editMessageText(chatId, messageId, confirmMsg,
+                    inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+        }
+    }
+
+    private void handleDebtPayCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        if (parts.length < 2) return;
+        String action = parts[1];
+
+        switch (action) {
+            case "start", "select" -> {
+                Long debtId = parts.length > 2 ? Long.parseLong(parts[2]) : null;
+                if (debtId == null) {
+                    List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
+                    var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                    apiClient.editMessageText(chatId, messageId, "Kimga qarz to‘lamoqchisiz?",
+                            inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
+                    return;
+                }
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.PAY_BORROWED, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    String prompt = String.format("%sga qancha bermoqchisiz?\n\nQolgan qarz:\n<b>%s</b>",
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()));
+                    apiClient.editMessageText(chatId, messageId, prompt,
+                            inlineKeyboardFactory.getDebtAmountChoiceKeyboard(debtId, debt.getRemainingAmount(), "debt_pay"), "HTML");
+                }
+            }
+            case "person" -> {
+                String person = parts[2];
+                List<Debt> debts = debtService.getActiveDebts(user.getId(), DebtType.BORROWED).stream()
+                        .filter(d -> d.getPersonName().equalsIgnoreCase(person)).toList();
+                apiClient.editMessageText(chatId, messageId, "Qaysi qarzni to‘lamoqchisiz?",
+                        inlineKeyboardFactory.getDebtSubSelectionKeyboard(debts, "debt_pay"), null);
+            }
+            case "back_persons", "back" -> {
+                List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
+                var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                apiClient.editMessageText(chatId, messageId, "Kimga qarz to‘lamoqchisiz?",
+                        inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
+            }
+            case "full", "full_start" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.PAY_BORROWED, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    var session = debtFlowService.getSession(user.getId());
+                    session.setPaymentAmount(debt.getRemainingAmount());
+                    session.setFull(true);
+                    apiClient.editMessageText(chatId, messageId, "Pul qayerdan beriladi?",
+                            inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debtId, "debt_pay"), null);
+                }
+            }
+            case "custom" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.PAY_BORROWED, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_PAY_AMOUNT);
+                    apiClient.sendMessage(chatId, "💰 <b>To‘laydigan summani kiriting:</b>\n\nMasalan:\n<code>500000</code>",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                }
+            }
+            case "back_amt" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    String prompt = String.format("%sga qancha bermoqchisiz?\n\nQolgan qarz:\n<b>%s</b>",
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()));
+                    apiClient.editMessageText(chatId, messageId, prompt,
+                            inlineKeyboardFactory.getDebtAmountChoiceKeyboard(debtId, debt.getRemainingAmount(), "debt_pay"), "HTML");
+                }
+            }
+            case "method" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String methodKey = parts[3];
+                String method = "card".equalsIgnoreCase(methodKey) ? "Karta" : "Naqd";
+                var session = debtFlowService.getSession(user.getId());
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent() && session != null) {
+                    Debt debt = debtOpt.get();
+                    session.setPaymentMethod(method);
+                    if (session.isFull()) {
+                        String confirmMsg = String.format("""
+                                👤 <b>%s</b>
+
+                                💳 To‘liq qarz to‘lovi:
+                                <b>%s</b>
+
+                                💵 To‘lov turi: <b>%s</b>
+
+                                Shundan keyin bu qarz to‘liq yopiladi.
+
+                                Davom etamizmi?
+                                """,
+                                BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                                MoneyFormatter.format(session.getPaymentAmount()),
+                                method
+                        );
+                        apiClient.editMessageText(chatId, messageId, confirmMsg,
+                                inlineKeyboardFactory.getDebtFullPaymentConfirmationKeyboard(debtId, "debt_pay", true), "HTML");
+                    } else {
+                        BigDecimal payAmt = session.getPaymentAmount();
+                        BigDecimal remainingAfter = debt.getRemainingAmount().subtract(payAmt);
+                        String confirmMsg = String.format("""
+                                💳 <b>QARZ TO‘LASH</b>
+
+                                👤 <b>%s</b>
+
+                                💰 Hozir to‘laysiz:
+                                <b>%s</b>
+
+                                📌 Oldingi qarz:
+                                <b>%s</b>
+
+                                ✅ To‘lovdan keyin qoladi:
+                                <b>%s</b>
+
+                                💵 To‘lov turi: <b>%s</b>
+
+                                Tasdiqlaysizmi?
+                                """,
+                                BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                                MoneyFormatter.format(payAmt),
+                                MoneyFormatter.format(debt.getRemainingAmount()),
+                                MoneyFormatter.format(remainingAfter),
+                                method
+                        );
+                        apiClient.editMessageText(chatId, messageId, confirmMsg,
+                                inlineKeyboardFactory.getDebtPaymentConfirmationKeyboard(debtId, "debt_pay", true), "HTML");
+                    }
+                }
+            }
+            case "confirm" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String actionKey = "debt_pay_confirm_" + debtId + "_" + messageId;
+                if (!idempotencyService.tryAcquireAction(actionKey)) return;
+
+                var session = debtFlowService.getSession(user.getId());
+                String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
+                BigDecimal payAmt = (session != null && session.getPaymentAmount() != null) ? session.getPaymentAmount() : BigDecimal.ZERO;
+                com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makePartialPayment(debtId, user.getId(), payAmt, method, TransactionSource.MANUAL);
+                Debt updated = payment.getDebt();
+                BigDecimal available = balanceService.getAvailableBalance(user.getId());
+                debtFlowService.clearSession(user.getId());
+
+                String msg = String.format("""
+                        ✅ <b>To‘lov saqlandi</b>
+
+                        👤 <b>%s</b>
+
+                        💳 To‘ladingiz:
+                        <b>%s</b>
+
+                        📌 Oldingi qarz:
+                        <b>%s</b>
+
+                        🔴 Endi qolgan qarz:
+                        <b>%s</b>
+
+                        💰 Sizda mavjud:
+                        <b>%s</b>
+                        """,
+                        BotMessageBuilder.escapeHtml(updated.getPersonName()),
+                        MoneyFormatter.format(payAmt),
+                        MoneyFormatter.format(updated.getRemainingAmount().add(payAmt)),
+                        MoneyFormatter.format(updated.getRemainingAmount()),
+                        MoneyFormatter.format(available)
+                );
+                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+            }
+            case "confirm_full" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String actionKey = "debt_pay_full_confirm_" + debtId + "_" + messageId;
+                if (!idempotencyService.tryAcquireAction(actionKey)) return;
+
+                var session = debtFlowService.getSession(user.getId());
+                String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
+                com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makeFullPayment(debtId, user.getId(), method, TransactionSource.MANUAL);
+                Debt updated = payment.getDebt();
+                BigDecimal available = balanceService.getAvailableBalance(user.getId());
+                debtFlowService.clearSession(user.getId());
+
+                String msg = String.format("""
+                        ✅ <b>Qarz to‘liq yopildi</b>
+
+                        👤 <b>%s</b>
+                        💰 To‘landi: <b>%s</b>
+                        📌 Qoldiq: <b>0 so‘m</b>
+
+                        💰 Sizda mavjud:
+                        <b>%s</b>
+                        """,
+                        BotMessageBuilder.escapeHtml(updated.getPersonName()),
+                        MoneyFormatter.format(updated.getOriginalAmount()),
+                        MoneyFormatter.format(available)
+                );
+                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+            }
+            case "cancel" -> {
+                debtFlowService.clearSession(user.getId());
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+            }
+        }
+    }
+
+    private void handleDebtReturnCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        if (parts.length < 2) return;
+        String action = parts[1];
+
+        switch (action) {
+            case "start", "select" -> {
+                Long debtId = parts.length > 2 ? Long.parseLong(parts[2]) : null;
+                if (debtId == null) {
+                    List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
+                    var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                    apiClient.editMessageText(chatId, messageId, "Kim qarz qaytardi?",
+                            inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
+                    return;
+                }
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.RETURN_LENT, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    String prompt = String.format("%s qancha qaytardi?\n\nQolgan qarzi:\n<b>%s</b>",
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()));
+                    apiClient.editMessageText(chatId, messageId, prompt,
+                            inlineKeyboardFactory.getDebtAmountChoiceKeyboard(debtId, debt.getRemainingAmount(), "debt_ret"), "HTML");
+                }
+            }
+            case "person" -> {
+                String person = parts[2];
+                List<Debt> debts = debtService.getActiveDebts(user.getId(), DebtType.LENT).stream()
+                        .filter(d -> d.getPersonName().equalsIgnoreCase(person)).toList();
+                apiClient.editMessageText(chatId, messageId, "Qaysi qarz qaytdi?",
+                        inlineKeyboardFactory.getDebtSubSelectionKeyboard(debts, "debt_ret"), null);
+            }
+            case "back_persons", "back" -> {
+                List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
+                var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                apiClient.editMessageText(chatId, messageId, "Kim qarz qaytardi?",
+                        inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
+            }
+            case "full", "full_start" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.RETURN_LENT, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    var session = debtFlowService.getSession(user.getId());
+                    session.setPaymentAmount(debt.getRemainingAmount());
+                    session.setFull(true);
+                    apiClient.editMessageText(chatId, messageId, "Pul qayerga tushdi?",
+                            inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debtId, "debt_ret"), null);
+                }
+            }
+            case "custom" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.RETURN_LENT, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_RETURN_AMOUNT);
+                    apiClient.sendMessage(chatId, "💰 <b>Qancha qaytardi?</b>\n\nMasalan:\n<code>600000</code>",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                }
+            }
+            case "back_amt" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    String prompt = String.format("%s qancha qaytardi?\n\nQolgan qarzi:\n<b>%s</b>",
+                            BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                            MoneyFormatter.format(debt.getRemainingAmount()));
+                    apiClient.editMessageText(chatId, messageId, prompt,
+                            inlineKeyboardFactory.getDebtAmountChoiceKeyboard(debtId, debt.getRemainingAmount(), "debt_ret"), "HTML");
+                }
+            }
+            case "method" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String methodKey = parts[3];
+                String method = "card".equalsIgnoreCase(methodKey) ? "Karta" : "Naqd";
+                var session = debtFlowService.getSession(user.getId());
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent() && session != null) {
+                    Debt debt = debtOpt.get();
+                    session.setPaymentMethod(method);
+                    if (session.isFull()) {
+                        String confirmMsg = String.format("""
+                                👤 <b>%s</b>
+
+                                💵 To‘liq qarz qaytarildi:
+                                <b>%s</b>
+
+                                💳 To‘lov turi: <b>%s</b>
+
+                                Shundan keyin bu qarz to‘liq yopiladi.
+
+                                Saqlaymizmi?
+                                """,
+                                BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                                MoneyFormatter.format(session.getPaymentAmount()),
+                                method
+                        );
+                        apiClient.editMessageText(chatId, messageId, confirmMsg,
+                                inlineKeyboardFactory.getDebtFullPaymentConfirmationKeyboard(debtId, "debt_ret", false), "HTML");
+                    } else {
+                        BigDecimal payAmt = session.getPaymentAmount();
+                        BigDecimal remainingAfter = debt.getRemainingAmount().subtract(payAmt);
+                        String confirmMsg = String.format("""
+                                💵 <b>QARZ QAYTARILDI</b>
+
+                                👤 <b>%s</b>
+
+                                💰 Qaytardi:
+                                <b>%s</b>
+
+                                📌 Oldingi qarz:
+                                <b>%s</b>
+
+                                ✅ Endi qoladi:
+                                <b>%s</b>
+
+                                💳 To‘lov turi: <b>%s</b>
+
+                                Saqlaymizmi?
+                                """,
+                                BotMessageBuilder.escapeHtml(debt.getPersonName()),
+                                MoneyFormatter.format(payAmt),
+                                MoneyFormatter.format(debt.getRemainingAmount()),
+                                MoneyFormatter.format(remainingAfter),
+                                method
+                        );
+                        apiClient.editMessageText(chatId, messageId, confirmMsg,
+                                inlineKeyboardFactory.getDebtPaymentConfirmationKeyboard(debtId, "debt_ret", false), "HTML");
+                    }
+                }
+            }
+            case "confirm" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String actionKey = "debt_ret_confirm_" + debtId + "_" + messageId;
+                if (!idempotencyService.tryAcquireAction(actionKey)) return;
+
+                var session = debtFlowService.getSession(user.getId());
+                String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
+                BigDecimal payAmt = (session != null && session.getPaymentAmount() != null) ? session.getPaymentAmount() : BigDecimal.ZERO;
+                com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makePartialPayment(debtId, user.getId(), payAmt, method, TransactionSource.MANUAL);
+                Debt updated = payment.getDebt();
+                debtFlowService.clearSession(user.getId());
+
+                String methodAddLine = "Karta".equalsIgnoreCase(method)
+                        ? "💳 Kartangizga qo‘shildi: <b>" + MoneyFormatter.format(payAmt) + "</b>"
+                        : "💵 Naqdingizga qo‘shildi: <b>" + MoneyFormatter.format(payAmt) + "</b>";
+
+                String msg = String.format("""
+                        ✅ <b>Qarz qaytarildi</b>
+
+                        👤 <b>%s</b>
+
+                        💰 Qaytardi:
+                        <b>%s</b>
+
+                        🟢 %sda endi qolgan:
+                        <b>%s</b>
+
+                        %s
+                        """,
+                        BotMessageBuilder.escapeHtml(updated.getPersonName()),
+                        MoneyFormatter.format(payAmt),
+                        BotMessageBuilder.escapeHtml(updated.getPersonName()),
+                        MoneyFormatter.format(updated.getRemainingAmount()),
+                        methodAddLine
+                );
+                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+            }
+            case "confirm_full" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                String actionKey = "debt_ret_full_confirm_" + debtId + "_" + messageId;
+                if (!idempotencyService.tryAcquireAction(actionKey)) return;
+
+                var session = debtFlowService.getSession(user.getId());
+                String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
+                com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makeFullPayment(debtId, user.getId(), method, TransactionSource.MANUAL);
+                Debt updated = payment.getDebt();
+                debtFlowService.clearSession(user.getId());
+
+                String methodAddLine = "Karta".equalsIgnoreCase(method)
+                        ? "💳 Kartangizga qo‘shildi: <b>" + MoneyFormatter.format(updated.getOriginalAmount()) + "</b>"
+                        : "💵 Naqdingizga qo‘shildi: <b>" + MoneyFormatter.format(updated.getOriginalAmount()) + "</b>";
+
+                String msg = String.format("""
+                        ✅ <b>%sning qarzi to‘liq yopildi.</b>
+
+                        Qoldiq:
+                        <b>0 so‘m</b>
+
+                        %s
+                        """,
+                        BotMessageBuilder.escapeHtml(updated.getPersonName()),
+                        methodAddLine
+                );
+                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+            }
+            case "cancel" -> {
+                debtFlowService.clearSession(user.getId());
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+            }
+        }
+    }
+
+    private void handleDebtVoiceCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        if (parts.length < 2) return;
+        String action = parts[1];
+
+        switch (action) {
+            case "pay_full" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.PAY_BORROWED, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    var session = debtFlowService.getSession(user.getId());
+                    session.setPaymentAmount(debt.getRemainingAmount());
+                    session.setFull(true);
+                    apiClient.editMessageText(chatId, messageId, "Pul qayerdan berildi?",
+                            inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debtId, "debt_pay"), null);
+                }
+            }
+            case "ret_full" -> {
+                Long debtId = Long.parseLong(parts[2]);
+                var debtOpt = debtService.getDebt(debtId, user.getId());
+                if (debtOpt.isPresent()) {
+                    Debt debt = debtOpt.get();
+                    debtFlowService.startSession(user.getId(), DebtFlowService.FlowType.RETURN_LENT, debtId, debt.getPersonName(), debt.getRemainingAmount());
+                    var session = debtFlowService.getSession(user.getId());
+                    session.setPaymentAmount(debt.getRemainingAmount());
+                    session.setFull(true);
+                    apiClient.editMessageText(chatId, messageId, "Pul qayerga tushdi?",
+                            inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debtId, "debt_ret"), null);
+                }
+            }
+            case "cancel" -> apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
         }
     }
 
