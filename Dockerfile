@@ -18,8 +18,8 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Install curl, tzdata, python and ffmpeg for speech recognition
-RUN apk --no-cache add curl tzdata python3 py3-pip ffmpeg && \
+# Install curl, tzdata, python, flac and ffmpeg for speech recognition
+RUN apk --no-cache add curl tzdata python3 py3-pip ffmpeg flac && \
     pip install --no-cache-dir imageio-ffmpeg SpeechRecognition --break-system-packages
 
 # Create dedicated non-root application user

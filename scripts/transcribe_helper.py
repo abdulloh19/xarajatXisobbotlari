@@ -5,6 +5,30 @@ import subprocess
 import imageio_ffmpeg
 import speech_recognition as sr
 
+# Patch SpeechRecognition AudioData.get_flac_data to use ffmpeg if flac binary is missing or fails (e.g. Alpine musl libc)
+_orig_get_flac_data = sr.AudioData.get_flac_data
+
+def _safe_get_flac_data(self, convert_rate=None, convert_width=None):
+    try:
+        return _orig_get_flac_data(self, convert_rate, convert_width)
+    except Exception:
+        wav_data = self.get_wav_data(convert_rate, convert_width)
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        cmd = [ffmpeg_exe, "-y", "-f", "wav", "-i", "pipe:0", "-f", "flac", "pipe:1"]
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+        flac_bytes, _ = proc.communicate(wav_data)
+        if proc.returncode == 0 and flac_bytes:
+            return flac_bytes
+        raise
+
+sr.AudioData.get_flac_data = _safe_get_flac_data
+
+
 EXPENSE_CATEGORY_WORDS = (
     "zapravka|zaprafka|benzin|gaz|metan|propan|yoqilgi|yoqilg'i|"
     "taksi|taxi|yo'l|yol|avtobus|metro|"
