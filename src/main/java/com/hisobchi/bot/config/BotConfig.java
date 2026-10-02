@@ -18,6 +18,7 @@ public class BotConfig {
     private String defaultTimezone = "Asia/Tashkent";
     private SpeechToTextConfig speechToText = new SpeechToTextConfig();
     private AiConfig ai = new AiConfig();
+    private WebhookConfig webhook = new WebhookConfig();
     private int draftTtlMinutes = 30;
 
     public ZoneId getZoneId() {
@@ -43,5 +44,13 @@ public class BotConfig {
         private String baseUrl = "https://api.openai.com/v1";
         private String model = "gpt-4o-mini";
         private boolean enabled = true;
+    }
+
+    @Getter
+    @Setter
+    public static class WebhookConfig {
+        private boolean enabled = true;
+        private String url = "https://hisobchi-bot-4g83.onrender.com/api/telegram/webhook";
+        private String secretToken = "";
     }
 }

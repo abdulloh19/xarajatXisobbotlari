@@ -30,6 +30,21 @@ public class TelegramPollingRunner implements CommandLineRunner, AutoCloseable {
             return;
         }
 
+        if (botConfig.getWebhook() != null && botConfig.getWebhook().isEnabled()) {
+            String webhookUrl = botConfig.getWebhook().getUrl();
+            log.info("Telegram Webhook mode enabled. Setting webhook to: {}", webhookUrl);
+            boolean success = apiClient.setWebhook(webhookUrl, botConfig.getWebhook().getSecretToken());
+            if (success) {
+                log.info("Telegram webhook successfully registered to {}. Long-polling runner skipped.", webhookUrl);
+                return;
+            } else {
+                log.warn("Failed to register Telegram webhook. Falling back to long-polling mode.");
+            }
+        } else {
+            log.info("Telegram Webhook is disabled. Clearing webhook for long-polling...");
+            apiClient.deleteWebhook();
+        }
+
         Thread pollingThread = new Thread(this::pollUpdates, "telegram-polling-worker");
         pollingThread.setDaemon(true);
         pollingThread.start();

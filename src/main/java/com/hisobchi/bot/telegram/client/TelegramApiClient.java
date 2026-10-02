@@ -192,4 +192,34 @@ public class TelegramApiClient {
             return List.of();
         }
     }
+
+    public boolean setWebhook(String url, String secretToken) {
+        if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return false;
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("url", url);
+            if (secretToken != null && !secretToken.isBlank()) {
+                body.put("secret_token", secretToken);
+            }
+            body.put("allowed_updates", List.of("message", "callback_query"));
+            String json = executePost("setWebhook", body);
+            log.info("Telegram setWebhook to {}: {}", url, json);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to set Telegram webhook to {}: {}", url, e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean deleteWebhook() {
+        if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return false;
+        try {
+            String json = executePost("deleteWebhook", Map.of("drop_pending_updates", false));
+            log.info("Telegram deleteWebhook: {}", json);
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to delete Telegram webhook: {}", e.getMessage());
+            return false;
+        }
+    }
 }

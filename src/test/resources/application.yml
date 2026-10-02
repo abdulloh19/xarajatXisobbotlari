@@ -18,6 +18,8 @@ bot:
   token: "test_bot_token_mock"
   username: "test_hisobchi_bot"
   default-timezone: "Asia/Tashkent"
+  webhook:
+    enabled: false
   speech-to-text:
     api-key: "mock-key"
     base-url: "https://api.openai.com/v1"
@@ -28,6 +30,9 @@ bot:
     model: "gpt-4o-mini"
     enabled: false
   draft-ttl-minutes: 30
+
+keep-alive:
+  enabled: false
 
 logging:
   level:

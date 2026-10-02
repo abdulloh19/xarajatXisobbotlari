@@ -35,6 +35,10 @@ bot:
   token: ${TELEGRAM_BOT_TOKEN:}
   username: ${TELEGRAM_BOT_USERNAME:gggg1232_bot}
   default-timezone: ${APP_TIMEZONE:Asia/Tashkent}
+  webhook:
+    enabled: ${TELEGRAM_WEBHOOK_ENABLED:true}
+    url: ${TELEGRAM_WEBHOOK_URL:https://hisobchi-bot-4g83.onrender.com/api/telegram/webhook}
+    secret-token: ${TELEGRAM_WEBHOOK_SECRET:}
   speech-to-text:
     api-key: ${AI_API_KEY:}
     base-url: ${AI_BASE_URL:https://api.openai.com/v1}
@@ -45,6 +49,10 @@ bot:
     model: ${AI_MODEL:gpt-4o-mini}
     enabled: ${AI_ENABLED:true}
   draft-ttl-minutes: 30
+
+keep-alive:
+  enabled: ${KEEP_ALIVE_ENABLED:true}
+  url: ${KEEP_ALIVE_URL:https://hisobchi-bot-4g83.onrender.com/actuator/health}
 
 logging:
   level:
