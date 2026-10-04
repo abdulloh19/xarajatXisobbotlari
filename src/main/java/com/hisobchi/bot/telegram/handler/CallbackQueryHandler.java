@@ -767,24 +767,40 @@ public class CallbackQueryHandler {
 
     private void handleProfitCallback(User user, Long chatId, Integer messageId, String[] parts) {
         if ("enter".equals(parts[1])) {
+            LocalDate targetDate = (parts.length > 2) ? LocalDate.parse(parts[2]) : DateTimeUtils.today(user.getTimezone());
+            textMessageHandler.setProfitTargetDate(user.getId(), targetDate);
             userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
+            String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                    ? "Bugun"
+                    : DateTimeUtils.formatUzbekDate(targetDate);
             apiClient.sendMessage(chatId,
-                    "💼 <b>Bugun ishladingizmi?</b>",
-                    inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
+                    "💼 <b>" + dateLabel + " ishladingizmi?</b>",
+                    inlineKeyboardFactory.getWorkDayConfirmationKeyboard(targetDate), "HTML");
         } else if ("work".equals(parts[1])) {
             String choice = parts[2];
+            LocalDate targetDate = (parts.length > 3)
+                    ? LocalDate.parse(parts[3])
+                    : textMessageHandler.getProfitTargetDate(user.getId());
+            if (targetDate == null) {
+                targetDate = DateTimeUtils.today(user.getTimezone());
+            }
+            textMessageHandler.setProfitTargetDate(user.getId(), targetDate);
+            String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                    ? "Bugungi"
+                    : DateTimeUtils.formatUzbekDate(targetDate);
+
             if ("yes".equals(choice)) {
-                apiClient.editMessageText(chatId, messageId, "✅ <b>Ish kuni</b> deb belgilandi.", null, "HTML");
+                apiClient.editMessageText(chatId, messageId, "✅ <b>Ish kuni</b> (" + dateLabel + ") deb belgilandi.", null, "HTML");
                 userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
                 apiClient.sendMessage(chatId,
-                        "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
+                        "💵 <b>" + dateLabel + " naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
                         replyKeyboardFactory.getCancelMenu(), "HTML");
             } else if ("no".equals(choice)) {
-                LocalDate today = DateTimeUtils.today(user.getTimezone());
-                dailyProfitService.markOffDay(user, today);
+                dailyProfitService.markOffDay(user, targetDate);
                 apiClient.editMessageText(chatId, messageId,
-                        "🏖 <b>Bugun dam!</b>\n\nMaroqli dam oling! Bugun qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                        "🏖 <b>" + dateLabel + " dam olish kuni deb belgilandi!</b>\n\nUshbu kunda qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
                         null, "HTML");
+                textMessageHandler.removeProfitTargetDate(user.getId());
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
                 apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             }

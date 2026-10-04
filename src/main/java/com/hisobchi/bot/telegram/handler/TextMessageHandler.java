@@ -90,6 +90,23 @@ public class TextMessageHandler {
     private final ConcurrentHashMap<Long, Long> userActiveDebtDraftId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Long> userExtendingDebtId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Long> userEditingTransactionId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, LocalDate> userProfitTargetDates = new ConcurrentHashMap<>();
+
+    public void setProfitTargetDate(Long userId, LocalDate date) {
+        if (date != null) {
+            userProfitTargetDates.put(userId, date);
+        } else {
+            userProfitTargetDates.remove(userId);
+        }
+    }
+
+    public LocalDate getProfitTargetDate(Long userId) {
+        return userProfitTargetDates.get(userId);
+    }
+
+    public LocalDate removeProfitTargetDate(Long userId) {
+        return userProfitTargetDates.remove(userId);
+    }
 
     public void setUserEditingTransactionId(Long userId, Long txId) {
         userEditingTransactionId.put(userId, txId);
@@ -230,11 +247,13 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getCloseDayConfirmationKeyboard(), "HTML");
                 return;
             }
-            case "💵 Foydani kiritish" -> {
+            case "💵 Foydani kiritish", "Foydani kiritish" -> {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                setProfitTargetDate(user.getId(), today);
                 userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
                 apiClient.sendMessage(chatId,
                         "💼 <b>Bugun ishladingizmi?</b>\n\nAgar bugun dam olgan bo‘lsangiz, xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
-                        inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
+                        inlineKeyboardFactory.getWorkDayConfirmationKeyboard(today), "HTML");
                 return;
             }
             case "🤝 Qarzlar", "📋 Qarzlar" -> {
@@ -339,24 +358,21 @@ public class TextMessageHandler {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(6);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                sendPeriodReport(chatId, data);
                 return;
             }
             case "📆 Oxirgi 14 kun", "📅 Oxirgi 14 kun", "Oxirgi 14 kun" -> {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(13);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "2 HAFTALIK HISOBOT");
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                sendPeriodReport(chatId, data);
                 return;
             }
             case "📆 Oxirgi 21 kun", "📅 Oxirgi 21 kun", "Oxirgi 21 kun" -> {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(20);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "3 HAFTALIK HISOBOT");
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                sendPeriodReport(chatId, data);
                 return;
             }
             case "🗓 O‘tgan oy", "🗓 O'tgan oy", "📅 O‘tgan oy", "📅 O'tgan oy", "O‘tgan oy", "O'tgan oy" -> {
@@ -366,8 +382,7 @@ public class TextMessageHandler {
                 LocalDate end = prev.with(TemporalAdjusters.lastDayOfMonth());
                 String title = prev.getMonth().name() + " " + prev.getYear() + " HISOBOTI";
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, title);
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                sendPeriodReport(chatId, data);
                 return;
             }
             case "🗓 Shu oy", "📅 Shu oy", "Shu oy" -> {
@@ -375,8 +390,7 @@ public class TextMessageHandler {
                 LocalDate start = today.withDayOfMonth(1);
                 String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                sendPeriodReport(chatId, data);
                 return;
             }
             case "📅 Bugun", "Bugun" -> {
@@ -416,23 +430,32 @@ public class TextMessageHandler {
 
         switch (state) {
             case WAITING_WORK_DAY_CONFIRMATION -> {
+                LocalDate targetDate = getProfitTargetDate(user.getId());
+                if (targetDate == null) {
+                    targetDate = DateTimeUtils.today(user.getTimezone());
+                }
+                String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                        ? "Bugungi"
+                        : DateTimeUtils.formatUzbekDate(targetDate);
+
                 String lower = text.trim().toLowerCase();
                 if (lower.contains("ha") || lower.contains("ishla") || lower.contains("yes") || lower.equals("+")) {
+                    setProfitTargetDate(user.getId(), targetDate);
                     userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
                     apiClient.sendMessage(chatId,
-                            "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
+                            "💵 <b>" + dateLabel + " naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
                             replyKeyboardFactory.getCancelMenu(), "HTML");
                 } else if (lower.contains("yo'q") || lower.contains("yoq") || lower.contains("dam") || lower.contains("no") || lower.equals("-")) {
-                    LocalDate today = DateTimeUtils.today(user.getTimezone());
-                    dailyProfitService.markOffDay(user, today);
+                    dailyProfitService.markOffDay(user, targetDate);
+                    removeProfitTargetDate(user.getId());
                     userService.updateState(user.getTelegramId(), UserState.IDLE);
                     apiClient.sendMessage(chatId,
-                            "🏖 <b>Bugun dam!</b>\n\nMaroqli dam oling! Bugun qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                            "🏖 <b>" + dateLabel + " dam!</b>\n\nMaroqli dam oling! Ushbu kunda qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
                             replyKeyboardFactory.getMainMenu(), "HTML");
                 } else {
                     apiClient.sendMessage(chatId,
-                            "💼 <b>Iltimos, tanlang: Bugun ishladingizmi?</b>",
-                            inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
+                            "💼 <b>Iltimos, tanlang: " + dateLabel + " ishladingizmi?</b>",
+                            inlineKeyboardFactory.getWorkDayConfirmationKeyboard(targetDate), "HTML");
                 }
             }
             case WAITING_DAILY_PROFIT_CASH -> {
@@ -448,9 +471,16 @@ public class TextMessageHandler {
                     }
                 }
                 userCashProfits.put(user.getId(), cash);
+                LocalDate targetDate = getProfitTargetDate(user.getId());
+                if (targetDate == null) {
+                    targetDate = DateTimeUtils.today(user.getTimezone());
+                }
+                String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                        ? "Bugungi"
+                        : DateTimeUtils.formatUzbekDate(targetDate);
                 userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CARD);
                 apiClient.sendMessage(chatId,
-                        "💳 <b>Bugungi kartadagi foydani kiriting:</b>\n<i>Masalan: 80000 yoki 80 ming</i>\n(Agar kartada bo'lmasa <code>0</code> deb yozing)",
+                        "💳 <b>" + dateLabel + " kartadagi foydani kiriting:</b>\n<i>Masalan: 80000 yoki 80 ming</i>\n(Agar kartada bo'lmasa <code>0</code> deb yozing)",
                         replyKeyboardFactory.getCancelMenu(), "HTML");
             }
             case WAITING_DAILY_PROFIT_CARD -> {
@@ -469,26 +499,34 @@ public class TextMessageHandler {
                 BigDecimal cash = userCashProfits.remove(user.getId());
                 if (cash == null) cash = BigDecimal.ZERO;
 
-                LocalDate today = DateTimeUtils.today(user.getTimezone());
-                dailyProfitService.saveOrUpdateProfit(user, today, cash, card);
+                LocalDate targetDate = removeProfitTargetDate(user.getId());
+                if (targetDate == null) {
+                    targetDate = DateTimeUtils.today(user.getTimezone());
+                }
+                dailyProfitService.saveOrUpdateProfit(user, targetDate, cash, card);
 
                 BigDecimal totalProfit = cash.add(card);
                 BigDecimal expense = transactionRepository.sumAmountByUserIdAndTypeAndDate(
-                        user.getId(), TransactionType.EXPENSE, today);
+                        user.getId(), TransactionType.EXPENSE, targetDate);
                 if (expense == null) expense = BigDecimal.ZERO;
                 BigDecimal totalEarned = expense.add(totalProfit);
 
+                String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                        ? "Bugungi"
+                        : DateTimeUtils.formatUzbekDate(targetDate);
+
                 String msg = String.format("""
-                        ✅ <b>Bugungi foyda saqlandi!</b>
+                        ✅ <b>%s foyda saqlandi!</b>
 
                         💵 <b>Naqd:</b> %s
                         💳 <b>Karta:</b> %s
                         ━━━━━━━━━━━━━━━━━━
-                        ✅ <b>BUGUNGI FOYDA:</b> %s
+                        ✅ <b>FOYDA:</b> %s
                         💸 <b>Xarajatlar:</b> %s
                         💰 <b>Umumiy ishlab topilgan:</b> %s
                         ━━━━━━━━━━━━━━━━━━
                         """,
+                        dateLabel,
                         MoneyFormatter.format(cash),
                         MoneyFormatter.format(card),
                         MoneyFormatter.format(totalProfit),
@@ -1050,6 +1088,16 @@ public class TextMessageHandler {
         }
         String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
         apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText), "HTML");
+    }
+
+    private void sendPeriodReport(Long chatId, ReportData data) {
+        String msg = reportService.formatPeriodReport(data);
+        var inlineKbd = inlineKeyboardFactory.getPeriodReportKeyboard(data.incompleteDates());
+        if (inlineKbd != null) {
+            apiClient.sendMessage(chatId, msg, inlineKbd, "HTML");
+        } else {
+            apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+        }
     }
 
     private boolean isCancelCommand(String text) {

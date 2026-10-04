@@ -33,11 +33,17 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getWorkDayConfirmationKeyboard() {
+        return getWorkDayConfirmationKeyboard(null);
+    }
+
+    public InlineKeyboardMarkup getWorkDayConfirmationKeyboard(LocalDate date) {
+        String yesData = date != null ? "profit:work:yes:" + date : "profit:work:yes";
+        String noData = date != null ? "profit:work:no:" + date : "profit:work:no";
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("✅ Ha, ishladim", "profit:work:yes"),
-                                new InlineKeyboardButton("🏖 Yo‘q, dam oldim", "profit:work:no")
+                                new InlineKeyboardButton("✅ Ha, ishladim", yesData),
+                                new InlineKeyboardButton("🏖 Yo‘q, dam oldim", noData)
                         ),
                         List.of(
                                 new InlineKeyboardButton("❌ Bekor qilish", "day:close:cancel")
@@ -273,10 +279,23 @@ public class InlineKeyboardFactory {
                 .inlineKeyboard(List.of(
                         List.of(
                                 new InlineKeyboardButton("🧾 Operatsiyalarni ko‘rish / tahrirlash", "tx:list_date:" + date),
-                                new InlineKeyboardButton("💵 Foydani o‘zgartirish", "profit:enter")
+                                new InlineKeyboardButton("💵 Foydani o‘zgartirish", "profit:enter:" + date)
                         )
                 ))
                 .build();
+    }
+
+    public InlineKeyboardMarkup getPeriodReportKeyboard(List<LocalDate> incompleteDates) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        if (incompleteDates != null) {
+            for (LocalDate d : incompleteDates) {
+                String label = "💵 " + DateTimeUtils.formatUzbekDate(d) + " foydasini kiritish";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "profit:enter:" + d)
+                ));
+            }
+        }
+        return rows.isEmpty() ? null : InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
     }
 
     public InlineKeyboardMarkup getDebtConfirmationKeyboard(Long draftId) {

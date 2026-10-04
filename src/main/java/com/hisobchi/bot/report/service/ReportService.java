@@ -51,6 +51,12 @@ public class ReportService {
             card = p.getCardAmount();
             profit = p.getTotalProfit();
             entered = true;
+        } else {
+            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.INCOME, date);
+            if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
+                profit = inc;
+                entered = true;
+            }
         }
 
         // Section 64: JAMI ISHLANGAN = XARAJAT + USER KIRITGAN FOYDA
@@ -100,14 +106,25 @@ public class ReportService {
             BigDecimal dayExp = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.EXPENSE, d);
             boolean hasExp = dayExp != null && dayExp.compareTo(BigDecimal.ZERO) > 0;
 
+            if (p != null && !p.isWorkDay()) {
+                // Dam olish kuni deb belgilangan kun — foydasi kiritilmagan kun hisoblanmaydi
+                continue;
+            }
+
             if (p != null && p.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
                 completedDays++;
                 cashSum = cashSum.add(p.getCashAmount());
                 cardSum = cardSum.add(p.getCardAmount());
                 profitSum = profitSum.add(p.getTotalProfit());
-            } else if (hasExp) {
-                incompleteDays++;
-                incompleteDates.add(d);
+            } else {
+                BigDecimal dayInc = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.INCOME, d);
+                if (dayInc != null && dayInc.compareTo(BigDecimal.ZERO) > 0) {
+                    completedDays++;
+                    profitSum = profitSum.add(dayInc);
+                } else if (hasExp) {
+                    incompleteDays++;
+                    incompleteDates.add(d);
+                }
             }
         }
 
