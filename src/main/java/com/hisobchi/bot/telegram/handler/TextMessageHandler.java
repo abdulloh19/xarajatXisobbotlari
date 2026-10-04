@@ -293,7 +293,7 @@ public class TextMessageHandler {
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
                 return;
             }
-            case "📋 Men olgan qarzlar" -> {
+            case "📋 Men olgan qarzlar", "Mening qarzlarim", "mening qarzlarim" -> {
                 List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
                 String msg = BotMessageBuilder.buildActiveDebtsList(borrowed, DebtType.BORROWED);
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
@@ -627,25 +627,41 @@ public class TextMessageHandler {
             }
             case WAITING_VOICE_DEBT_PERSON -> {
                 var session = debtFlowService.getSession(user.getId());
+                DebtType type = debtFlowService.getDebtType(user.getId());
+                BigDecimal amount = debtFlowService.getDebtAmount(user.getId());
+                LocalDate dueDate = null;
+
                 if (session != null) {
-                    session.setPersonName(text.trim());
-                    if (session.getDueDate() == null) {
-                        userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_DATE);
-                        apiClient.sendMessage(chatId, "📅 <b>Qachongacha qaytarishi kerak?</b>\n\nMasalan:\n<code>10 oktabr</code>\n<code>keyingi juma</code>\n(yoki <i>'O‘tkazib yuborish'</i> deb yozing)", replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
-                    } else {
-                        DebtType type = session.getFlowType() == DebtFlowService.FlowType.RETURN_LENT ? DebtType.LENT : DebtType.BORROWED;
-                        userDebtTypes.put(user.getId(), type);
-                        userDebtAmounts.put(user.getId(), session.getPaymentAmount());
-                        userDebtPersons.put(user.getId(), session.getPersonName());
-                        userDebtDates.put(user.getId(), session.getDueDate());
-                        debtFlowService.clearSession(user.getId());
-                        userService.updateState(user.getTelegramId(), UserState.IDLE);
-                        apiClient.sendMessage(chatId, "Pulni qanday " + (type == DebtType.BORROWED ? "oldingiz?" : "berdingiz?"), inlineKeyboardFactory.getDebtCreationPaymentMethodKeyboard(), null);
+                    if (type == null) {
+                        type = session.getFlowType() == DebtFlowService.FlowType.RETURN_LENT ? DebtType.LENT : DebtType.BORROWED;
                     }
-                } else {
-                    userService.updateState(user.getTelegramId(), UserState.IDLE);
-                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                    if (amount == null) {
+                        amount = session.getPaymentAmount();
+                    }
+                    dueDate = session.getDueDate();
                 }
+                if (type == null) {
+                    type = userDebtTypes.getOrDefault(user.getId(), DebtType.BORROWED);
+                }
+                if (amount == null) {
+                    amount = userDebtAmounts.getOrDefault(user.getId(), BigDecimal.ZERO);
+                }
+
+                String cleanedPerson = com.hisobchi.bot.ai.service.DebtNlpService.cleanEntityName(text.trim());
+                if (cleanedPerson.isBlank()) cleanedPerson = text.trim();
+
+                debtFlowService.clear(user.getId());
+                userDebtAmounts.remove(user.getId());
+                userDebtTypes.remove(user.getId());
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+                DebtDraft draft = debtDraftService.createDraft(
+                        user, type, amount, cleanedPerson, dueDate, null, text, 0.9, "Naqd", LocalDate.now()
+                );
+                String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
+                apiClient.sendMessage(chatId, confirmMsg,
+                        inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             }
             case WAITING_VOICE_DEBT_DATE -> {
                 var session = debtFlowService.getSession(user.getId());
@@ -676,15 +692,33 @@ public class TextMessageHandler {
                     return;
                 }
                 userDebtAmounts.put(user.getId(), amountOpt.get());
+                String existingPerson = debtFlowService.getDebtPerson(user.getId());
+                if (existingPerson == null) existingPerson = userDebtPersons.get(user.getId());
+
                 DebtType type = userDebtTypes.getOrDefault(user.getId(), DebtType.BORROWED);
+                if (existingPerson != null && !existingPerson.isBlank() && !"Noma'lum".equalsIgnoreCase(existingPerson)) {
+                    userDebtPersons.put(user.getId(), existingPerson);
+                    debtFlowService.clear(user.getId());
+                    DebtDraft draft = debtDraftService.createDraft(
+                            user, type, amountOpt.get(), existingPerson, null, null, text, 0.9, "Naqd", LocalDate.now()
+                    );
+                    String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
+                    apiClient.sendMessage(chatId, confirmMsg,
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+
                 userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_PERSON);
                 String personPrompt = type == DebtType.BORROWED
-                        ? "👤 <b>Kimdan oldingiz?</b>\n\nMasalan:\n<i>Akmal</i>"
+                        ? "👤 <b>Kimdan yoki nimadan oldingiz?</b>\n\nMasalan:\n<i>Moy</i>, <i>Zapravka</i>, <i>Akmal</i>"
                         : "👤 <b>Kimga berdingiz?</b>\n\nMasalan:\n<i>Javlon</i>";
                 apiClient.sendMessage(chatId, personPrompt, replyKeyboardFactory.getCancelMenu(), "HTML");
             }
             case WAITING_DEBT_PERSON -> {
-                userDebtPersons.put(user.getId(), text.trim());
+                String cleanedPerson = com.hisobchi.bot.ai.service.DebtNlpService.cleanEntityName(text.trim());
+                userDebtPersons.put(user.getId(), cleanedPerson.isBlank() ? text.trim() : cleanedPerson);
                 DebtType type = userDebtTypes.getOrDefault(user.getId(), DebtType.BORROWED);
                 userService.updateState(user.getTelegramId(), UserState.WAITING_DEBT_DATE);
                 String datePrompt = type == DebtType.BORROWED

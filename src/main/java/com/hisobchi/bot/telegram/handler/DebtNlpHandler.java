@@ -196,25 +196,8 @@ public class DebtNlpHandler {
                     debtFlowService.setDebtType(user.getId(), DebtType.LENT);
                     debtFlowService.setDebtAmount(user.getId(), d.amount());
                     userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_PERSON);
-                    String msg = "🎙 <b>" + MoneyFormatter.format(d.amount()) + "</b> qarz berdingiz deb tushundim.\n\n👤 <b>Kimga berdingiz?</b>";
+                    String msg = "🟢 <b>" + MoneyFormatter.format(d.amount()) + "</b> qarz berdingiz deb tushundim.\n\n👤 <b>Kimga berdingiz?</b>";
                     apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getCancelMenu(), "HTML");
-                } else if (d.missingDueDate()) {
-                    debtFlowService.setDebtType(user.getId(), DebtType.LENT);
-                    debtFlowService.setDebtPerson(user.getId(), d.personName());
-                    debtFlowService.setDebtAmount(user.getId(), d.amount());
-                    userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_DATE);
-                    String msg = String.format("""
-                            🎙 <b>Tushundim:</b>
-
-                            👤 <b>%sga</b>
-                            💸 <b>%s</b> qarz berdingiz.
-
-                            📅 <b>Qachongacha qaytarishi kerak?</b>
-                            """,
-                            BotMessageBuilder.escapeHtml(d.personName()),
-                            MoneyFormatter.format(d.amount())
-                    );
-                    apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
                 } else {
                     DebtDraft debtDraft = debtDraftService.createDraft(
                             user, d.type(), d.amount(), d.personName(), d.dueDate(), d.description(), rawText, d.confidence(),
@@ -230,25 +213,8 @@ public class DebtNlpHandler {
                     debtFlowService.setDebtType(user.getId(), DebtType.BORROWED);
                     debtFlowService.setDebtAmount(user.getId(), d.amount());
                     userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_PERSON);
-                    String msg = "🎙 <b>" + MoneyFormatter.format(d.amount()) + "</b> qarz oldingiz deb tushundim.\n\n👤 <b>Kimdan oldingiz?</b>";
+                    String msg = "🔴 <b>" + MoneyFormatter.format(d.amount()) + "</b> qarz oldingiz (siz qarzsiz) deb tushundim.\n\n👤 <b>Kimdan yoki nimadan (masalan: Moy, Zapravka, Ali) qarz bo‘ldingiz?</b>";
                     apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getCancelMenu(), "HTML");
-                } else if (d.missingDueDate()) {
-                    debtFlowService.setDebtType(user.getId(), DebtType.BORROWED);
-                    debtFlowService.setDebtPerson(user.getId(), d.personName());
-                    debtFlowService.setDebtAmount(user.getId(), d.amount());
-                    userService.updateState(user.getTelegramId(), UserState.WAITING_VOICE_DEBT_DATE);
-                    String msg = String.format("""
-                            🎙 <b>Tushundim:</b>
-
-                            👤 <b>%sdan</b>
-                            💰 <b>%s</b> qarz oldingiz.
-
-                            📅 <b>Qachon qaytarishingiz kerak?</b>
-                            """,
-                            BotMessageBuilder.escapeHtml(d.personName()),
-                            MoneyFormatter.format(d.amount())
-                    );
-                    apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getSkipOrCancelMenu(), "HTML");
                 } else {
                     DebtDraft debtDraft = debtDraftService.createDraft(
                             user, d.type(), d.amount(), d.personName(), d.dueDate(), d.description(), rawText, d.confidence(),

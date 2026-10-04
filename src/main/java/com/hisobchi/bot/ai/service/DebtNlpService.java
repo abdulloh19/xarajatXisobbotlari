@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,8 +26,17 @@ public class DebtNlpService {
 
     // Pattern to capture person name with Uzbek case endings (-dan, -ga, -ka, -qa):
     // "Rustam akadan", "Akmal akadan", "Rustamga", "Rustam akaga", "Javlonga", "Boburdan"
+    // Pattern to capture person name with Uzbek case endings (-dan, -ga, -ka, -qa):
+    // "Rustam akadan", "Akmal akadan", "Rustamga", "Rustam akaga", "Javlonga", "Boburdan", "moydan", "zapravkadan", "dokondan"
     private static final Pattern PERSON_SUFFIX_PATTERN = Pattern.compile(
             "\\b([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)(?:dan|ga|ka|qa)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    // Pattern to capture entity immediately preceding "qarzman", "qarz oldim", etc.
+    // "moy qarzman", "benzin uchun qarzman", "moydan qarzman"
+    private static final Pattern PRE_DEBT_PATTERN = Pattern.compile(
+            "\\b([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)\\s+(?:uchun\\s+)?(?:qarzman|qarzdorman|qarz\\s+oldim|qarz\\s+olganman|qarz\\s+oganman)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
@@ -44,10 +54,18 @@ public class DebtNlpService {
         String lower = text.toLowerCase().trim();
 
         // Check if message is related to debt
-        boolean hasDebtWord = lower.contains("qarz") || lower.contains("qarzga") || lower.contains("qarzim") || lower.contains("qarzini");
+        boolean hasDebtWord = lower.contains("qarz")
+                || lower.contains("qarzman")
+                || lower.contains("qarzdor")
+                || lower.contains("qarzdorman")
+                || lower.contains("qarzga")
+                || lower.contains("qarzim")
+                || lower.contains("qarzini")
+                || lower.contains("nasiya")
+                || lower.contains("nasiyaga");
         boolean hasReturnWord = lower.contains("qaytardi") || lower.contains("qaytdi") || lower.contains("qaytardim");
-        boolean hasBorrowVerb = lower.contains("oldim") || lower.contains("berishim kerak") || lower.contains("beraman");
-        boolean hasLentVerb = lower.contains("berdim") || lower.contains("beradi") || lower.contains("berishi kerak");
+        boolean hasBorrowVerb = lower.contains("oldim") || lower.contains("olganman") || lower.contains("oganman") || lower.contains("berishim kerak") || lower.contains("beraman");
+        boolean hasLentVerb = lower.contains("berdim") || lower.contains("berganman") || lower.contains("beradi") || lower.contains("berishi kerak");
 
         if (!hasDebtWord && !hasReturnWord && !hasBorrowVerb && !hasLentVerb) {
             return Optional.empty();
@@ -141,18 +159,33 @@ public class DebtNlpService {
             return DebtIntent.RETURN_PARTIAL;
         }
 
-        // 5. Creating BORROWED debt: "qarz oldim", "Rustam akadan oldim", "oldim, beraman"
-        if (lower.contains("qarz oldim") || (lower.contains("oldim") && !lower.contains("qarz berdim"))) {
+        // 5. Creating BORROWED debt (User owes money / borrowed money):
+        // "250min qarzman", "moydan 250 ming qarzman", "qarz oldim", "qarz olganman", "qarz bo'ldim"
+        if (lower.contains("qarzman")
+                || lower.contains("qarzdorman")
+                || lower.contains("qarz oldim")
+                || lower.contains("qarz olganman")
+                || lower.contains("qarz oganman")
+                || lower.contains("qarz ogamman")
+                || lower.contains("qarz boldim")
+                || lower.contains("qarz bo'ldim")
+                || lower.contains("qarz bo‘ldim")
+                || lower.contains("qarzga oldim")
+                || lower.contains("qarzga oganman")
+                || lower.contains("nasiyaga oldim")
+                || lower.contains("nasiya")
+                || (lower.contains("qarz") && (lower.contains("oldim") || lower.contains("olganman") || lower.contains("oganman") || lower.contains("olindi") || lower.contains("olgan")))
+                || (lower.contains("oldim") && !lower.contains("berdim") && !lower.contains("qarz berdim"))) {
             return DebtIntent.BORROW;
         }
 
-        // 6. Creating LENT debt: "qarz berdim", "Sherzodga 3 million qarz berdim"
+        // 6. Creating LENT debt (User lent money to someone else):
         if (lower.contains("qarz berdim") || lower.contains("qarzga berdim") || (lower.contains("berdim") && !lower.contains("qarzimdan") && !lower.contains("hammasini"))) {
             return DebtIntent.LEND;
         }
 
         // Fallbacks
-        if (lower.contains("berishim kerak") || lower.contains("qaytaraman")) {
+        if (lower.contains("berishim kerak") || lower.contains("qaytaraman") || lower.contains("qarzim bor")) {
             return DebtIntent.BORROW;
         }
 
@@ -164,7 +197,7 @@ public class DebtNlpService {
     }
 
     private String extractPersonName(String text, String lower, DebtIntent intent) {
-        // 1. Suffix match: "Rustam akadan", "Rustam akaga", "Rustamga"
+        // 1. Suffix match: "Rustam akadan", "moydan", "zapravkadan", "do'kondan"
         Matcher suffixMatcher = PERSON_SUFFIX_PATTERN.matcher(text);
         while (suffixMatcher.find()) {
             String candidate = suffixMatcher.group(1).trim();
@@ -174,7 +207,17 @@ public class DebtNlpService {
             }
         }
 
-        // 2. Leading person subject: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
+        // 2. Pre-debt match: "moy qarzman", "benzin uchun qarzman"
+        Matcher preMatcher = PRE_DEBT_PATTERN.matcher(text);
+        if (preMatcher.find()) {
+            String candidate = preMatcher.group(1).trim();
+            String candLower = candidate.toLowerCase();
+            if (!isFilteredWord(candLower)) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        // 3. Leading person subject: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
         Matcher leadMatcher = LEADING_PERSON_PATTERN.matcher(text);
         if (leadMatcher.find()) {
             String candidate = leadMatcher.group(1).trim();
@@ -187,9 +230,47 @@ public class DebtNlpService {
         return null;
     }
 
+    private static final Set<String> FILTERED_EXACT_WORDS = Set.of(
+            "bugun", "kecha", "ertaga", "indin", "ertalab", "kechqurun", "kunduzi",
+            "oy", "hafta", "yil", "kun",
+            "karta", "kartadan", "kartaga", "plastik", "plastikdan", "naqd", "naqdga",
+            "hisob", "hisobdan", "hisobimdan",
+            "men", "menga", "meni", "mening", "sen", "sendan", "senga",
+            "siz", "sizdan", "sizga", "u", "unga", "undan",
+            "biz", "bizdan", "ular", "ulardan",
+            "ozim", "o'zim", "o‘zim",
+            "oldim", "olganman", "oganman", "berdim", "berganman",
+            "qaytardi", "qaytardim", "toladim", "to'ladim", "to‘ladim",
+            "boldim", "bo'ldim", "bo‘ldim",
+            "ming", "min", "mln", "million", "som", "so'm", "so‘m", "sum",
+            "pul", "pulni", "summa", "xarajat", "daromad", "foyda"
+    );
+
     private boolean isFilteredWord(String word) {
         if (word == null || word.isBlank()) return true;
-        return word.matches(".*(?:bugun|kecha|ertalab|kechqurun|oy|hafta|karta|kartadan|naqd|bank|bozor|dokon|magazin|zapravka|taksi|tushlik|obed|qarz|qarzim|qarzini|hamma|hammasi|barcha|barchasi|men|menga|sendan|undan|bizdan).*");
+        String[] parts = word.trim().toLowerCase().split("\\s+");
+        boolean allFiltered = true;
+        for (String p : parts) {
+            boolean isPFiltered = FILTERED_EXACT_WORDS.contains(p)
+                    || p.startsWith("qarz")
+                    || p.startsWith("nasiya")
+                    || p.startsWith("hamma")
+                    || p.startsWith("barcha");
+            if (!isPFiltered) {
+                allFiltered = false;
+                break;
+            }
+        }
+        return allFiltered;
+    }
+
+    public static String cleanEntityName(String input) {
+        if (input == null || input.isBlank()) return "Noma'lum";
+        String t = input.trim();
+        // Remove trailing case suffixes -dan, -ga, -ka, -qa, -uchun
+        t = t.replaceAll("(?i)(?:dan|ga|ka|qa|uchun)$", "").trim();
+        if (t.isBlank()) return input.trim();
+        return Character.toUpperCase(t.charAt(0)) + (t.length() > 1 ? t.substring(1) : "");
     }
 
     private String capitalizeWords(String input) {

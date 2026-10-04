@@ -251,8 +251,8 @@ public final class BotMessageBuilder {
         java.time.format.DateTimeFormatter dFmt = java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         if (isBorrowed) {
-            sb.append("🔴 <b>QARZ OLDINGIZ</b>\n\n");
-            sb.append("👤 <b>Kimdan:</b>\n").append(escapeHtml(draft.getPersonName())).append("\n\n");
+            sb.append("🔴 <b>QARZ OLDINGIZ (MENING QARZIM)</b>\n\n");
+            sb.append("👤 <b>Kimdan / Nimadan:</b>\n").append(escapeHtml(draft.getPersonName())).append(" (shundan qarzsiz)\n\n");
             sb.append("💰 <b>Summa:</b>\n").append(MoneyFormatter.format(draft.getAmount())).append("\n\n");
             sb.append("📅 <b>Qaytarish:</b>\n")
                     .append(draft.getDueDate() != null ? draft.getDueDate().format(dFmt) : "<i>Belgilanmagan</i>").append("\n\n");
@@ -280,13 +280,13 @@ public final class BotMessageBuilder {
         LocalDate today = LocalDate.now();
         java.time.format.DateTimeFormatter shortFmt = java.time.format.DateTimeFormatter.ofPattern("d-MMMM", java.util.Locale.forLanguageTag("uz-UZ"));
 
-        sb.append("🔴 <b>MEN OLGAN QARZLAR</b>\n\n");
+        sb.append("🔴 <b>MEN OLGAN QARZLAR (MENING QARZLARIM)</b>\n\n");
         if (borrowed.isEmpty()) {
             sb.append("<i>Olingan qarzlar yo‘q</i>\n\n");
         } else {
             int i = 1;
             for (com.hisobchi.bot.debt.entity.Debt d : borrowed) {
-                sb.append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
+                sb.append(i++).append(". 👤 <b>").append(escapeHtml(d.getPersonName())).append("</b> (qarzsiz)\n");
                 sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
                 if (d.getDueDate() != null) {
                     long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
@@ -303,7 +303,7 @@ public final class BotMessageBuilder {
         } else {
             int i = 1;
             for (com.hisobchi.bot.debt.entity.Debt d : lent) {
-                sb.append(i++).append(". <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
+                sb.append(i++).append(". 👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
                 sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
                 if (d.getDueDate() != null) {
                     long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
@@ -320,7 +320,7 @@ public final class BotMessageBuilder {
     public static String buildActiveDebtsList(List<com.hisobchi.bot.debt.entity.Debt> debts, com.hisobchi.bot.debt.entity.DebtType type) {
         StringBuilder sb = new StringBuilder();
         boolean isBorrowed = type == com.hisobchi.bot.debt.entity.DebtType.BORROWED;
-        sb.append(isBorrowed ? "🔴 <b>MEN OLGAN QARZLAR</b>\n" : "🟢 <b>MEN BERGAN QARZLAR</b>\n");
+        sb.append(isBorrowed ? "🔴 <b>MEN OLGAN QARZLAR (MENING QARZLARIM)</b>\n" : "🟢 <b>MEN BERGAN QARZLAR</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
         if (debts == null || debts.isEmpty()) {
@@ -333,7 +333,12 @@ public final class BotMessageBuilder {
 
         int i = 1;
         for (com.hisobchi.bot.debt.entity.Debt d : debts) {
-            sb.append(i++).append(". 👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>\n");
+            sb.append(i++).append(". 👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>");
+            if (isBorrowed) {
+                sb.append(" (qarzsiz)\n");
+            } else {
+                sb.append("\n");
+            }
             sb.append("💰 Qolgan: <b>").append(MoneyFormatter.format(d.getRemainingAmount())).append("</b>\n");
             if (d.getDueDate() != null) {
                 long days = java.time.temporal.ChronoUnit.DAYS.between(today, d.getDueDate());
@@ -375,7 +380,7 @@ public final class BotMessageBuilder {
         sb.append("👤 <b>").append(escapeHtml(d.getPersonName())).append("</b>\n\n");
 
         if (isBorrowed) {
-            sb.append("🔴 <b>Siz qarz olgansiz</b>\n\n");
+            sb.append("🔴 <b>Siz qarz olgansiz (shundan qarzsiz)</b>\n\n");
         } else {
             sb.append("🟢 <b>Siz qarz bergansiz</b>\n\n");
         }
