@@ -24,4 +24,6 @@ public interface DebtPaymentRepository extends JpaRepository<DebtPayment, Long> 
             @Param("userId") Long userId,
             @Param("type") DebtPaymentType type,
             @Param("date") LocalDate date);
+
+    void deleteByUserId(Long userId);
 }

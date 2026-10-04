@@ -31,6 +31,7 @@ import com.hisobchi.bot.telegram.client.TelegramApiClient;
 import com.hisobchi.bot.telegram.keyboard.InlineKeyboardFactory;
 import com.hisobchi.bot.telegram.keyboard.ReplyKeyboardFactory;
 import com.hisobchi.bot.transaction.dto.DraftDto;
+import com.hisobchi.bot.transaction.dto.TransactionDto;
 import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionDraft;
 import com.hisobchi.bot.transaction.entity.TransactionSource;
@@ -460,6 +461,18 @@ public class TextMessageHandler {
                 userService.updateState(user.getTelegramId(), UserState.WAITING_NEW_CATEGORY_NAME);
                 apiClient.sendMessage(chatId, "Yangi kategoriya nomini kiriting (masalan: <i>Kutubxona</i>):",
                         replyKeyboardFactory.getCancelMenu(), "HTML");
+                return;
+            }
+            case "🔄 Bugundan boshlash (tozalash)", "/reset", "/tozalash", "tozalash" -> {
+                apiClient.sendMessage(chatId,
+                        """
+                        ⚠️ <b>Haqiqiy ish rejimiga o‘tish va tozalash:</b>
+
+                        Barcha oldingi sinov xarajatlari, daromadlar, kunlik hisobotlar va qarzlar to‘liq tozalanadi hamda barcha hisob-kitoblar <b>bugungi kundan noldan</b> boshlanadi!
+
+                        Buni tasdiqlaysizmi?
+                        """,
+                        inlineKeyboardFactory.getResetConfirmationKeyboard(), "HTML");
                 return;
             }
         }
@@ -1069,6 +1082,62 @@ public class TextMessageHandler {
                     "Iltimos, summani va kimdan/kimga ekanligini aniqroq yozing (masalan: <i>\"25 ming magazindan qarz\"</i> yoki <i>\"50 ming Aliga qarz berdim\"</i>):",
                     replyKeyboardFactory.getDebtsMenu(), "HTML");
             return;
+        }
+
+        // Safety guard: If message is asking for reports, history or duration periods, do NOT treat as expense/income
+        if (lowerText.contains("oxirgi") || lowerText.contains("hisobot")
+                || lowerText.contains("tarix") || lowerText.contains("statistika") || lowerText.contains("menyu")
+                || lowerText.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil)\\b.*")) {
+            if (lowerText.contains("7 kun")) {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(6);
+                if ("HISTORY".equals(userActiveMenu.get(user.getId()))) {
+                    sendPeriodHistory(chatId, user, start, end, "Oxirgi 7 kunlik");
+                } else {
+                    ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
+                    sendPeriodReport(chatId, data);
+                }
+                return;
+            } else if (lowerText.contains("14 kun")) {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(13);
+                ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "2 HAFTALIK HISOBOT");
+                sendPeriodReport(chatId, data);
+                return;
+            } else if (lowerText.contains("21 kun")) {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(20);
+                ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "3 HAFTALIK HISOBOT");
+                sendPeriodReport(chatId, data);
+                return;
+            } else if (lowerText.contains("kecha")) {
+                LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
+                sendDayHistory(chatId, user, yesterday, "Kechagi");
+                return;
+            } else if (lowerText.contains("bugun") && (lowerText.contains("hisobot") || lowerText.contains("tarix"))) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                ReportData report = reportService.getDailyReportData(user.getId(), today);
+                String msg = reportService.formatDailyReport(report, user.getId());
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
+                return;
+            } else if (lowerText.contains("shu oy")) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = today.withDayOfMonth(1);
+                String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
+                ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
+                sendPeriodReport(chatId, data);
+                return;
+            } else if (lowerText.contains("tarix")) {
+                setUserActiveMenu(user.getId(), "HISTORY");
+                apiClient.sendMessage(chatId, "📜 <b>Tarix bo‘limi:</b>\nDavrni tanlang:",
+                        replyKeyboardFactory.getHistoryMenu(), "HTML");
+                return;
+            } else if (lowerText.contains("hisobot")) {
+                setUserActiveMenu(user.getId(), "REPORTS");
+                apiClient.sendMessage(chatId, "📊 <b>Davriy hisobotlar:</b>\nKerakli davrni tanlang:",
+                        replyKeyboardFactory.getReportsMenu(), "HTML");
+                return;
+            }
         }
 
         // 2. Otherwise parse as standard transaction (expense/income)

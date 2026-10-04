@@ -28,4 +28,6 @@ public interface TransactionDraftRepository extends JpaRepository<TransactionDra
     @Modifying
     @Query("UPDATE TransactionDraft d SET d.status = 'EXPIRED' WHERE d.status = 'PENDING' AND d.expiresAt < :now")
     int expireOldDrafts(@Param("now") Instant now);
+
+    void deleteByUserId(Long userId);
 }

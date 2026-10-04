@@ -95,4 +95,6 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     List<Debt> findByStatusInAndDueDate(Collection<DebtStatus> statuses, LocalDate dueDate);
 
     List<Debt> findByStatusInAndDueDateBefore(Collection<DebtStatus> statuses, LocalDate date);
+
+    void deleteByUserId(Long userId);
 }

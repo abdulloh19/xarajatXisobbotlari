@@ -43,7 +43,7 @@ public final class BotMessageBuilder {
                 """;
     }
 
-    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone) {
+    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone, boolean isOffDay, String lastWorkDayText) {
         StringBuilder sb = new StringBuilder();
 
         if (draft.source() == TransactionSource.VOICE) {

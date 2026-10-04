@@ -38,10 +38,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import com.hisobchi.bot.profit.entity.DailyProfit;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -67,6 +70,7 @@ public class CallbackQueryHandler {
     private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
     private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
+    private final com.hisobchi.bot.user.service.DataResetService dataResetService;
 
     public void handle(User user, CallbackQuery callback) {
         String data = callback.getData();
@@ -95,6 +99,7 @@ public class CallbackQueryHandler {
             case "profit" -> handleProfitCallback(user, chatId, messageId, parts);
             case "reminder" -> handleReminderCallback(user, chatId, messageId, parts);
             case "report" -> handleReportCallback(user, chatId, messageId, parts);
+            case "data" -> handleDataCallback(user, chatId, messageId, parts);
             case "history" -> {
                 if ("back".equals(parts[1])) {
                     textMessageHandler.setUserActiveMenu(user.getId(), "HISTORY");
@@ -102,6 +107,25 @@ public class CallbackQueryHandler {
                 }
             }
             default -> log.warn("Unknown callback query: {}", data);
+        }
+    }
+
+    private void handleDataCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        if (parts.length > 2 && "reset".equals(parts[1])) {
+            String sub = parts[2];
+            if ("confirm".equals(sub)) {
+                dataResetService.resetAllUserData(user.getId());
+                apiClient.editMessageText(chatId, messageId,
+                        "✅ <b>Barcha ma'lumotlar tozalandi!</b>\n\n" +
+                        "📅 Hisob-kitobingiz <b>bugundan</b> boshlab toza holatda boshlandi.\n\n" +
+                        "Endi haqiqiy daromad va xarajatlaringizni bemalol yozib borishingiz mumkin:\n" +
+                        "💰 <b>Foydani kiritish</b> — bugungi foydangizni kiriting\n" +
+                        "💸 <b>Xarajat qo‘shish</b> — xarajatlaringizni yozib boring",
+                        null, "HTML");
+                apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+            } else {
+                apiClient.editMessageText(chatId, messageId, "❌ Tozalash bekor qilindi.", null, null);
+            }
         }
     }
 

@@ -82,7 +82,7 @@ public class UzbekAmountParser {
 
     // Pattern for thousand: "15 ming", "15 min", "15k", "15 минг", "1.5 ming"
     private static final Pattern THOUSAND_PATTERN = Pattern.compile(
-            "(\\d+(?:[.,]\\d+)?)\\s*(?:ming|минг|min|мин|k|к)(?:\\s*(?:so['‘`]?m|som|сом))?",
+            "\\b(\\d+(?:[.,]\\d+)?)\\s*(?:ming\\b|минг\\b|min\\b|мин\\b|k\\b|к\\b)(?:\\s*(?:so['‘`]?m|som|сом))?",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
@@ -98,6 +98,11 @@ public class UzbekAmountParser {
         }
 
         String normalized = normalize(text);
+
+        // Guard: if the text is purely a duration or time navigation like "7 kun", "oxirgi 7 kun", ignore
+        if (isDurationOnly(normalized)) {
+            return Optional.empty();
+        }
 
         // 1. Check "X yarim million"
         Matcher halfMatcher = HALF_MILLION_PATTERN.matcher(normalized);
@@ -234,5 +239,13 @@ public class UzbekAmountParser {
         // Digits followed by "min" -> "ming"
         s = s.replaceAll("(?i)\\b(\\d+)\\s*min(?:i|ga|dan)?\\b", "$1 ming");
         return s;
+    }
+
+    private boolean isDurationOnly(String text) {
+        String lower = text.toLowerCase().trim();
+        if (lower.contains("so'm") || lower.contains("som") || lower.contains("ming") || lower.contains("mln") || lower.contains("million")) {
+            return false;
+        }
+        return lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil|soat|daqiqa|minut)\\b.*");
     }
 }

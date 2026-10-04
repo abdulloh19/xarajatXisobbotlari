@@ -97,4 +97,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             Long userId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     Page<Transaction> findByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId, Pageable pageable);
+
+    void deleteByUserId(Long userId);
 }

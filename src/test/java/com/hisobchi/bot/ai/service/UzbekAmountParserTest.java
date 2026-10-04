@@ -138,4 +138,25 @@ class UzbekAmountParserTest {
         assertTrue(result.isPresent());
         assertEquals(new BigDecimal("50000"), result.get());
     }
+
+    @Test
+    @DisplayName("Duration text 'Oxirgi 7 kun' must NOT be parsed as amount")
+    void testOxirgi7KunNotAmount() {
+        Optional<BigDecimal> result = parser.parse("Oxirgi 7 kun");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Duration text '7 kun' must NOT be parsed as 7k/7000")
+    void test7KunNotAmount() {
+        Optional<BigDecimal> result = parser.parse("7 kun");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Duration text '14 kun' must NOT be parsed as amount")
+    void test14KunNotAmount() {
+        Optional<BigDecimal> result = parser.parse("14 kun");
+        assertTrue(result.isEmpty());
+    }
 }

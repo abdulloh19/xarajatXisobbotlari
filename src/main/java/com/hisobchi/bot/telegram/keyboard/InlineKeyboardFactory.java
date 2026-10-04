@@ -4,6 +4,7 @@ import com.hisobchi.bot.category.entity.Category;
 import com.hisobchi.bot.debt.entity.Debt;
 import com.hisobchi.bot.debt.entity.DebtType;
 import com.hisobchi.bot.common.formatter.MoneyFormatter;
+import com.hisobchi.bot.common.util.DateTimeUtils;
 import com.hisobchi.bot.notification.entity.NotificationSettings;
 import com.hisobchi.bot.telegram.client.model.TelegramModels.*;
 import com.hisobchi.bot.transaction.entity.Transaction;
@@ -644,6 +645,19 @@ public class InlineKeyboardFactory {
                         List.of(new InlineKeyboardButton(icon3w + " 3 haftalik hisobot", "notif:toggle:rep_3week")),
                         List.of(new InlineKeyboardButton(iconMonth + " Oylik hisobot", "notif:toggle:rep_monthly")),
                         List.of(new InlineKeyboardButton("⬅️ Sozlamalarga qaytish", "notif:back"))
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getResetConfirmationKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🗑 Ha, tozalab bugundan boshlash", "data:reset:confirm")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Yo‘q, bekor qilish", "data:reset:cancel")
+                        )
                 ))
                 .build();
     }

@@ -13,4 +13,6 @@ public interface DailySummaryRepository extends JpaRepository<DailySummary, Long
     Optional<DailySummary> findByUserIdAndSummaryDate(Long userId, LocalDate summaryDate);
 
     boolean existsByUserIdAndSummaryDateAndClosedTrue(Long userId, LocalDate summaryDate);
+
+    void deleteByUserId(Long userId);
 }
