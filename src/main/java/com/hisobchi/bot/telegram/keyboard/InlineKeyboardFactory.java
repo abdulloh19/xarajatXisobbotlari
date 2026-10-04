@@ -177,6 +177,11 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getHistoryItemActionsKeyboard(Long transactionId) {
+        return getHistoryItemActionsKeyboard(transactionId, null);
+    }
+
+    public InlineKeyboardMarkup getHistoryItemActionsKeyboard(Long transactionId, LocalDate date) {
+        String listCallback = (date != null) ? "tx:list_date:" + date : "tx:list_today";
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
@@ -185,7 +190,7 @@ public class InlineKeyboardFactory {
                         ),
                         List.of(
                                 new InlineKeyboardButton("🗑 O‘chirish", "tx:delete_ask:" + transactionId),
-                                new InlineKeyboardButton("🧾 Operatsiyalar", "tx:list_today")
+                                new InlineKeyboardButton("🧾 Operatsiyalar", listCallback)
                         )
                 ))
                 .build();
@@ -269,7 +274,30 @@ public class InlineKeyboardFactory {
             }
         }
         rows.add(List.of(
-                new InlineKeyboardButton("⬅️ Orqaga", "report:daily")
+                new InlineKeyboardButton("⬅️ Tarix bo‘limi", "history:back")
+        ));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
+    }
+
+    public InlineKeyboardMarkup getTransactionsListKeyboard(List<Transaction> transactions, int maxItems) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        if (transactions != null) {
+            int count = 0;
+            for (Transaction tx : transactions) {
+                if (count >= maxItems) break;
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : "📌";
+                String name = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+                String prefix = tx.getType() == TransactionType.INCOME ? "+" : "-";
+                String label = emoji + " " + name + " (" + prefix + MoneyFormatter.format(tx.getAmount()) + ")";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "tx:detail:" + tx.getId())
+                ));
+                count++;
+            }
+        }
+        rows.add(List.of(
+                new InlineKeyboardButton("⬅️ Tarix bo‘limi", "history:back")
         ));
         return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
     }

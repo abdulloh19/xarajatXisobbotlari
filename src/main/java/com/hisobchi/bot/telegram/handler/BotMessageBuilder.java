@@ -8,6 +8,7 @@ import com.hisobchi.bot.statistics.dto.MonthlyStatisticsDto;
 import com.hisobchi.bot.statistics.dto.WeeklyStatisticsDto;
 import com.hisobchi.bot.transaction.dto.DraftDto;
 import com.hisobchi.bot.transaction.dto.TransactionDto;
+import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionSource;
 import com.hisobchi.bot.transaction.entity.TransactionType;
 
@@ -238,6 +239,110 @@ public final class BotMessageBuilder {
             sb.append("/tx_").append(tx.id()).append(" (batafsil)\n\n");
         }
 
+        return sb.toString();
+    }
+
+    public static String buildDayTransactionsHistoryDetailed(LocalDate date, List<Transaction> list, String timezone) {
+        if (list == null || list.isEmpty()) {
+            return "ℹ️ <b>" + DateTimeUtils.formatUzbekDate(date) + "</b> kuni hech qanday operatsiya topilmadi.";
+        }
+
+        BigDecimal income = BigDecimal.ZERO;
+        BigDecimal expense = BigDecimal.ZERO;
+        for (Transaction tx : list) {
+            if (tx.getType() == TransactionType.INCOME) {
+                income = income.add(tx.getAmount());
+            } else {
+                expense = expense.add(tx.getAmount());
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📜 <b>OPERATSIYALAR TARIXI</b>\n");
+        sb.append("📅 <b>").append(DateTimeUtils.formatUzbekDate(date)).append("</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n");
+        if (income.compareTo(BigDecimal.ZERO) > 0) {
+            sb.append("💰 Jami daromad: <b>+").append(MoneyFormatter.format(income)).append("</b>\n");
+        }
+        sb.append("💸 Jami xarajat: <b>-").append(MoneyFormatter.format(expense)).append("</b>\n");
+        sb.append("🧾 Jami operatsiyalar: <b>").append(list.size()).append(" ta</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        int idx = 1;
+        for (Transaction tx : list) {
+            String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                    ? tx.getCategory().getEmoji() : "📌";
+            String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+            String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
+            String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+
+            sb.append(idx++).append(". ").append(emoji).append(" <b>").append(escapeHtml(catName)).append("</b>: ");
+            sb.append("<b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>\n");
+            sb.append("   ⏱ <i>").append(timeStr).append("</i>");
+            if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
+                sb.append(" • <i>").append(escapeHtml(tx.getDescription())).append("</i>");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("\n<i>Tahrirlash yoki o‘chirish uchun kerakli operatsiya tugmasini bosing:</i>");
+        return sb.toString();
+    }
+
+    public static String buildPeriodTransactionsHistory(String title, LocalDate start, LocalDate end, List<Transaction> list, String timezone) {
+        if (list == null || list.isEmpty()) {
+            return "ℹ️ <b>" + title + "</b> (" + DateTimeUtils.formatUzbekDateRange(start, end) + ") bo‘yicha hech qanday operatsiya topilmadi.";
+        }
+
+        BigDecimal income = BigDecimal.ZERO;
+        BigDecimal expense = BigDecimal.ZERO;
+        for (Transaction tx : list) {
+            if (tx.getType() == TransactionType.INCOME) {
+                income = income.add(tx.getAmount());
+            } else {
+                expense = expense.add(tx.getAmount());
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📜 <b>").append(title.toUpperCase()).append(" TARIXI</b>\n");
+        sb.append("📅 ").append(DateTimeUtils.formatUzbekDateRange(start, end)).append("\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n");
+        if (income.compareTo(BigDecimal.ZERO) > 0) {
+            sb.append("💰 Jami daromad: <b>+").append(MoneyFormatter.format(income)).append("</b>\n");
+        }
+        sb.append("💸 Jami xarajat: <b>-").append(MoneyFormatter.format(expense)).append("</b>\n");
+        sb.append("🧾 Jami operatsiyalar: <b>").append(list.size()).append(" ta</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        LocalDate currentDate = null;
+        int count = 0;
+        for (Transaction tx : list) {
+            if (count >= 25) {
+                sb.append("<i>... va yana ").append(list.size() - count).append(" ta operatsiya</i>\n");
+                break;
+            }
+            if (!tx.getTransactionDate().equals(currentDate)) {
+                currentDate = tx.getTransactionDate();
+                sb.append("📅 <b>").append(DateTimeUtils.formatUzbekDate(currentDate)).append("</b>\n");
+            }
+
+            String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                    ? tx.getCategory().getEmoji() : "📌";
+            String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+            String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
+            String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+
+            sb.append("  • ").append(timeStr).append(" | ").append(emoji).append(" ").append(escapeHtml(catName))
+              .append(": <b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>");
+            if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
+                sb.append(" (").append(escapeHtml(tx.getDescription())).append(")");
+            }
+            sb.append("\n");
+            count++;
+        }
+
+        sb.append("\n<i>Tahrirlash yoki o‘chirish uchun kerakli operatsiya tugmasini bosing:</i>");
         return sb.toString();
     }
 

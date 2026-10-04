@@ -31,7 +31,7 @@ import com.hisobchi.bot.telegram.client.TelegramApiClient;
 import com.hisobchi.bot.telegram.keyboard.InlineKeyboardFactory;
 import com.hisobchi.bot.telegram.keyboard.ReplyKeyboardFactory;
 import com.hisobchi.bot.transaction.dto.DraftDto;
-import com.hisobchi.bot.transaction.dto.TransactionDto;
+import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionDraft;
 import com.hisobchi.bot.transaction.entity.TransactionSource;
 import com.hisobchi.bot.transaction.entity.TransactionType;
@@ -91,6 +91,7 @@ public class TextMessageHandler {
     private final ConcurrentHashMap<Long, Long> userExtendingDebtId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Long> userEditingTransactionId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, LocalDate> userProfitTargetDates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, String> userActiveMenu = new ConcurrentHashMap<>();
 
     public void setProfitTargetDate(Long userId, LocalDate date) {
         if (date != null) {
@@ -106,6 +107,22 @@ public class TextMessageHandler {
 
     public LocalDate removeProfitTargetDate(Long userId) {
         return userProfitTargetDates.remove(userId);
+    }
+
+    public void setUserActiveMenu(Long userId, String menu) {
+        if (menu != null) {
+            userActiveMenu.put(userId, menu);
+        } else {
+            userActiveMenu.remove(userId);
+        }
+    }
+
+    public String getUserActiveMenu(Long userId) {
+        return userActiveMenu.get(userId);
+    }
+
+    public void removeUserActiveMenu(Long userId) {
+        userActiveMenu.remove(userId);
     }
 
     public void setUserEditingTransactionId(Long userId, Long txId) {
@@ -137,6 +154,7 @@ public class TextMessageHandler {
         // 1. Check Global Cancel / Navigation commands
         if (isCancelCommand(trimmed)) {
             userService.updateState(user.getTelegramId(), UserState.IDLE);
+            userActiveMenu.remove(user.getId());
             apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             return;
         }
@@ -213,6 +231,7 @@ public class TextMessageHandler {
                 return;
             }
             case "📜 Tarix" -> {
+                setUserActiveMenu(user.getId(), "HISTORY");
                 apiClient.sendMessage(chatId, "📜 <b>Tarix bo‘limi:</b>\nDavrni tanlang:",
                         replyKeyboardFactory.getHistoryMenu(), "HTML");
                 return;
@@ -350,15 +369,38 @@ public class TextMessageHandler {
                 return;
             }
             case "📊 Hisobotlar", "Hisobotlar" -> {
+                setUserActiveMenu(user.getId(), "REPORTS");
                 apiClient.sendMessage(chatId, "📊 <b>Davriy hisobotlar:</b>\nKerakli davrni tanlang:",
                         replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "📆 Oxirgi 7 kun", "📅 Oxirgi 7 kun", "Oxirgi 7 kun" -> {
+            case "📅 Kecha", "Kecha" -> {
+                LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
+                sendDayHistory(chatId, user, yesterday, "Kechagi");
+                return;
+            }
+            case "📅 Oxirgi 7 kun" -> {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(6);
+                sendPeriodHistory(chatId, user, start, end, "Oxirgi 7 kunlik");
+                return;
+            }
+            case "📆 Oxirgi 7 kun" -> {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(6);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
                 sendPeriodReport(chatId, data);
+                return;
+            }
+            case "Oxirgi 7 kun" -> {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(6);
+                if ("HISTORY".equals(userActiveMenu.get(user.getId()))) {
+                    sendPeriodHistory(chatId, user, start, end, "Oxirgi 7 kunlik");
+                } else {
+                    ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
+                    sendPeriodReport(chatId, data);
+                }
                 return;
             }
             case "📆 Oxirgi 14 kun", "📅 Oxirgi 14 kun", "Oxirgi 14 kun" -> {
@@ -388,23 +430,24 @@ public class TextMessageHandler {
             case "🗓 Shu oy", "📅 Shu oy", "Shu oy" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = today.withDayOfMonth(1);
-                String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
-                ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
-                sendPeriodReport(chatId, data);
+                if ("HISTORY".equals(userActiveMenu.get(user.getId()))) {
+                    sendPeriodHistory(chatId, user, start, today, "Shu oylik");
+                } else {
+                    String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
+                    ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
+                    sendPeriodReport(chatId, data);
+                }
                 return;
             }
             case "📅 Bugun", "Bugun" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
-                ReportData report = reportService.getDailyReportData(user.getId(), today);
-                String msg = reportService.formatDailyReport(report, user.getId());
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
-                return;
-            }
-            case "📅 Kecha", "Kecha" -> {
-                LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
-                ReportData report = reportService.getDailyReportData(user.getId(), yesterday);
-                String msg = reportService.formatDailyReport(report);
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(yesterday), "HTML");
+                if ("HISTORY".equals(userActiveMenu.get(user.getId()))) {
+                    sendDayHistory(chatId, user, today, "Bugungi");
+                } else {
+                    ReportData report = reportService.getDailyReportData(user.getId(), today);
+                    String msg = reportService.formatDailyReport(report, user.getId());
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
+                }
                 return;
             }
             case "🔔 Eslatmalar", "Eslatmalar" -> {
@@ -1088,6 +1131,21 @@ public class TextMessageHandler {
         }
         String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
         apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText), "HTML");
+    }
+
+    private void sendDayHistory(Long chatId, User user, LocalDate date, String label) {
+        List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), date);
+        String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(date, list, user.getTimezone());
+        var markup = inlineKeyboardFactory.getDailyOperationsKeyboard(list, date);
+        apiClient.sendMessage(chatId, msg, markup, "HTML");
+    }
+
+    private void sendPeriodHistory(Long chatId, User user, LocalDate start, LocalDate end, String title) {
+        List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
+                user.getId(), start, end);
+        String msg = BotMessageBuilder.buildPeriodTransactionsHistory(title, start, end, list, user.getTimezone());
+        var markup = inlineKeyboardFactory.getTransactionsListKeyboard(list, 15);
+        apiClient.sendMessage(chatId, msg, markup, "HTML");
     }
 
     private void sendPeriodReport(Long chatId, ReportData data) {

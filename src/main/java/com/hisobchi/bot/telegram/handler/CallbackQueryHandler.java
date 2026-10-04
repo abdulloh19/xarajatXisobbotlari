@@ -97,7 +97,8 @@ public class CallbackQueryHandler {
             case "report" -> handleReportCallback(user, chatId, messageId, parts);
             case "history" -> {
                 if ("back".equals(parts[1])) {
-                    apiClient.sendMessage(chatId, "📜 Tarix bo‘limi:", replyKeyboardFactory.getHistoryMenu(), null);
+                    textMessageHandler.setUserActiveMenu(user.getId(), "HISTORY");
+                    apiClient.sendMessage(chatId, "📜 <b>Tarix bo‘limi:</b>\nDavrni tanlang:", replyKeyboardFactory.getHistoryMenu(), "HTML");
                 }
             }
             default -> log.warn("Unknown callback query: {}", data);
@@ -1053,12 +1054,11 @@ public class CallbackQueryHandler {
             List<Transaction> transactions = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), date);
             if (transactions.isEmpty()) {
                 apiClient.editMessageText(chatId, messageId,
-                        "ℹ️ <b>" + DateTimeUtils.formatDate(date) + "</b> kuni operatsiyalar mavjud emas.",
-                        inlineKeyboardFactory.getDailyReportActionsKeyboard(date), "HTML");
+                        "ℹ️ <b>" + DateTimeUtils.formatUzbekDate(date) + "</b> kuni operatsiyalar mavjud emas.",
+                        inlineKeyboardFactory.getTransactionsListKeyboard(List.of(), 0), "HTML");
                 return;
             }
-            String msg = "🧾 <b>" + DateTimeUtils.formatDate(date) + " kungi operatsiyalar:</b>\n" +
-                    "<i>Tahrirlash yoki kategoriyani o‘zgartirish uchun kerakli operatsiyani bosing:</i>";
+            String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(date, transactions, user.getTimezone());
             apiClient.editMessageText(chatId, messageId, msg,
                     inlineKeyboardFactory.getDailyOperationsKeyboard(transactions, date), "HTML");
             return;
@@ -1072,7 +1072,7 @@ public class CallbackQueryHandler {
                 TransactionDto dto = transactionService.toDto(tx);
                 String msg = BotMessageBuilder.buildTransactionDetail(dto, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
+                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, tx.getTransactionDate()), "HTML");
             }
             case "delete_ask" -> {
                 apiClient.editMessageText(chatId, messageId,
@@ -1080,17 +1080,19 @@ public class CallbackQueryHandler {
                         inlineKeyboardFactory.getDeleteConfirmationKeyboard(txId), "HTML");
             }
             case "delete_confirm" -> {
+                Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
+                LocalDate txDate = tx.getTransactionDate();
                 transactionService.deleteTransaction(txId, user.getId());
-                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                List<Transaction> remaining = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), txDate);
                 apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>",
-                        inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
+                        inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
             }
             case "delete_cancel" -> {
                 Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
                 TransactionDto dto = transactionService.toDto(tx);
                 String msg = BotMessageBuilder.buildTransactionDetail(dto, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
+                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, tx.getTransactionDate()), "HTML");
             }
             case "edit" -> {
                 apiClient.editMessageText(chatId, messageId, "Qaysi maydonni tahrirlaysiz?",
@@ -1124,7 +1126,7 @@ public class CallbackQueryHandler {
                 TransactionDto updated = transactionService.updateTransaction(txId, user.getId(), null, cat, null, null);
                 String msg = "✅ <b>Kategoriya o‘zgartirildi!</b>\n\n" + BotMessageBuilder.buildTransactionDetail(updated, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId), "HTML");
+                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, updated.transactionDate()), "HTML");
             }
         }
     }
