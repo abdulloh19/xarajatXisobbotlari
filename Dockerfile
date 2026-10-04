@@ -20,6 +20,7 @@ WORKDIR /app
 
 # Install curl, tzdata, python, flac and ffmpeg for speech recognition
 RUN apk --no-cache add curl tzdata python3 py3-pip ffmpeg flac && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
     pip install --no-cache-dir imageio-ffmpeg SpeechRecognition --break-system-packages
 
 # Create dedicated non-root application user

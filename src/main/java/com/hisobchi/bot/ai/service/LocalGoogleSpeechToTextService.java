@@ -29,9 +29,10 @@ public class LocalGoogleSpeechToTextService implements SpeechToTextService {
         }
 
         try {
-            log.info("Running local/Google speech-to-text recognition for {}", audioFile.getAbsolutePath());
+            String pythonCmd = resolvePythonCommand();
+            log.info("Running speech-to-text recognition with {} for {}", pythonCmd, audioFile.getAbsolutePath());
 
-            ProcessBuilder pb = new ProcessBuilder("python", scriptFile.getAbsolutePath(), audioFile.getAbsolutePath());
+            ProcessBuilder pb = new ProcessBuilder(pythonCmd, scriptFile.getAbsolutePath(), audioFile.getAbsolutePath());
             pb.redirectErrorStream(false);
             Process process = pb.start();
 
@@ -77,5 +78,20 @@ public class LocalGoogleSpeechToTextService implements SpeechToTextService {
             log.error("Error executing speech recognition process: {}", e.getMessage(), e);
             return TranscriptionResult.failure("Ovozni matnga aylantirishda tizim xatosi: " + e.getMessage());
         }
+    }
+
+    private String resolvePythonCommand() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) {
+            return "python";
+        }
+        try {
+            Process p = new ProcessBuilder("python3", "--version").start();
+            if (p.waitFor(2, TimeUnit.SECONDS) && p.exitValue() == 0) {
+                return "python3";
+            }
+        } catch (Exception ignored) {
+        }
+        return "python";
     }
 }

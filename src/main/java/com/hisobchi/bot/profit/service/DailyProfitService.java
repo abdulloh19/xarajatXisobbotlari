@@ -63,4 +63,29 @@ public class DailyProfitService {
     public List<DailyProfit> getProfitsBetween(Long userId, LocalDate start, LocalDate end) {
         return dailyProfitRepository.findAllByUserIdAndProfitDateBetweenOrderByProfitDateAsc(userId, start, end);
     }
+
+    @Transactional
+    public void deductFromProfit(User user, LocalDate date, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
+        Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
+        if (profitOpt.isPresent()) {
+            DailyProfit p = profitOpt.get();
+            BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+            BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+
+            BigDecimal newCash = currentCash.subtract(amount);
+            BigDecimal newCard = currentCard;
+            if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+                BigDecimal deficit = newCash.abs();
+                newCash = BigDecimal.ZERO;
+                newCard = currentCard.subtract(deficit);
+                if (newCard.compareTo(BigDecimal.ZERO) < 0) {
+                    newCard = BigDecimal.ZERO;
+                }
+            }
+            saveOrUpdateProfit(user, date, newCash, newCard);
+            log.info("Deducted {} from profit for user {} on {}: new total={}",
+                    amount, user.getId(), date, newCash.add(newCard));
+        }
+    }
 }

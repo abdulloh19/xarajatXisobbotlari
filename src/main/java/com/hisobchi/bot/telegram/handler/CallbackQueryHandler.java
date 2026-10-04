@@ -66,6 +66,7 @@ public class CallbackQueryHandler {
     private final TextMessageHandler textMessageHandler;
     private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
+    private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
 
     public void handle(User user, CallbackQuery callback) {
         String data = callback.getData();
@@ -804,6 +805,9 @@ public class CallbackQueryHandler {
                 try {
                     TransactionDto saved = transactionService.confirmAndSave(draftId, user.getId());
                     LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    if (saved.type() == TransactionType.EXPENSE) {
+                        dailyProfitService.deductFromProfit(user, today, saved.amount());
+                    }
                     DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
 
                     String successMsg = BotMessageBuilder.buildSaveSuccessMessage(
@@ -821,6 +825,8 @@ public class CallbackQueryHandler {
                             replyKeyboardFactory.getMainMenu(), null);
                 }
             }
+            case "save_yesterday" -> handleSaveExpense(user, chatId, messageId, draftId, true);
+            case "save_today" -> handleSaveExpense(user, chatId, messageId, draftId, false);
             case "cancel" -> {
                 draftService.cancelDraft(draftId, user.getId());
                 apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
@@ -857,14 +863,14 @@ public class CallbackQueryHandler {
                 DraftDto dto = draftService.toDto(draft);
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type()), "HTML");
             }
             case "back" -> {
                 TransactionDraft d = draftService.getDraft(draftId, user.getId());
                 DraftDto dto = draftService.toDto(d);
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type()), "HTML");
             }
             case "intent" -> {
                 String intentType = parts[3];
@@ -874,6 +880,46 @@ public class CallbackQueryHandler {
                 apiClient.editMessageText(chatId, messageId, "Kategoriyani tanlang:",
                         inlineKeyboardFactory.getCategorySelectionKeyboard(draftId, categories), null);
             }
+        }
+    }
+
+    private void handleSaveExpense(User user, Long chatId, Integer messageId, Long draftId, boolean isYesterday) {
+        String actionKey = "save_draft_" + draftId;
+        if (!idempotencyService.tryAcquireAction(actionKey)) {
+            log.warn("Duplicate save ignored for draft {}", draftId);
+            return;
+        }
+
+        try {
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            LocalDate targetDate = isYesterday ? today.minusDays(1) : today;
+
+            TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), targetDate);
+
+            // Deduct from profit for the target date
+            dailyProfitService.deductFromProfit(user, targetDate, saved.amount());
+
+            // Recalculate daily stats for targetDate
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, targetDate);
+
+            // If yesterday, re-save the closed summary for yesterday with updated numbers
+            if (isYesterday) {
+                dailySummaryService.closeDay(user, targetDate, targetStats.totalIncome(), targetStats.totalExpense(), targetStats.netProfit());
+            }
+
+            String successMsg = BotMessageBuilder.buildSaveSuccessMessageWithSource(
+                    saved, isYesterday, targetStats.totalExpense(), targetStats.totalIncome(), targetStats.netProfit());
+
+            apiClient.editMessageText(chatId, messageId, successMsg,
+                    inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+            userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+        } catch (ValidationException e) {
+            apiClient.sendMessage(chatId, "⚠️ " + e.getMessage(), replyKeyboardFactory.getMainMenu(), null);
+        } catch (Exception e) {
+            log.error("Failed to save expense draft {} with isYesterday={}: {}", draftId, isYesterday, e.getMessage(), e);
+            apiClient.sendMessage(chatId, "⚠️ Xatolik yuz berdi. Qaytadan urinib ko‘ring.",
+                    replyKeyboardFactory.getMainMenu(), null);
         }
     }
 

@@ -1,6 +1,7 @@
 package com.hisobchi.bot.telegram.handler;
 
 import com.hisobchi.bot.idempotency.service.IdempotencyService;
+import com.hisobchi.bot.summary.service.DailyAutoCloseService;
 import com.hisobchi.bot.telegram.client.TelegramApiClient;
 import com.hisobchi.bot.telegram.client.model.TelegramModels.*;
 import com.hisobchi.bot.user.entity.User;
@@ -21,6 +22,7 @@ public class UpdateDispatcher {
     private final CallbackQueryHandler callbackQueryHandler;
     private final TelegramApiClient apiClient;
     private final IdempotencyService idempotencyService;
+    private final DailyAutoCloseService dailyAutoCloseService;
 
     public void dispatch(Update update) {
         if (update == null) return;
@@ -55,6 +57,7 @@ public class UpdateDispatcher {
         com.hisobchi.bot.telegram.client.model.TelegramModels.User from = message.getFrom();
         User user = userService.getOrCreateUser(
                 from.getId(), from.getFirstName(), from.getLastName(), from.getUsername());
+        dailyAutoCloseService.autoClosePastDays(user);
 
         Long chatId = message.getChat().getId();
 
@@ -76,6 +79,7 @@ public class UpdateDispatcher {
         com.hisobchi.bot.telegram.client.model.TelegramModels.User from = callbackQuery.getFrom();
         User user = userService.getOrCreateUser(
                 from.getId(), from.getFirstName(), from.getLastName(), from.getUsername());
+        dailyAutoCloseService.autoClosePastDays(user);
 
         callbackQueryHandler.handle(user, callbackQuery);
     }

@@ -5,13 +5,11 @@ import subprocess
 import imageio_ffmpeg
 import speech_recognition as sr
 
-# Patch SpeechRecognition AudioData.get_flac_data to use ffmpeg if flac binary is missing or fails (e.g. Alpine musl libc)
+# Patch SpeechRecognition AudioData.get_flac_data to use ffmpeg (completely avoids missing flac-linux-x86_64 on Alpine/musl)
 _orig_get_flac_data = sr.AudioData.get_flac_data
 
 def _safe_get_flac_data(self, convert_rate=None, convert_width=None):
     try:
-        return _orig_get_flac_data(self, convert_rate, convert_width)
-    except Exception:
         wav_data = self.get_wav_data(convert_rate, convert_width)
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         cmd = [ffmpeg_exe, "-y", "-f", "wav", "-i", "pipe:0", "-f", "flac", "pipe:1"]
@@ -24,7 +22,9 @@ def _safe_get_flac_data(self, convert_rate=None, convert_width=None):
         flac_bytes, _ = proc.communicate(wav_data)
         if proc.returncode == 0 and flac_bytes:
             return flac_bytes
-        raise
+    except Exception:
+        pass
+    return _orig_get_flac_data(self, convert_rate, convert_width)
 
 sr.AudioData.get_flac_data = _safe_get_flac_data
 

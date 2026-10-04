@@ -17,9 +17,9 @@ services:
       - key: APP_TIMEZONE
         value: Asia/Tashkent
       - key: TELEGRAM_BOT_TOKEN
-        value: 8828605194:AAEp1SExRuB8VN63F8tvJKKPAPv9uAOOEnw
+        sync: false
       - key: TELEGRAM_BOT_USERNAME
-        value: gggg1232_bot
+        sync: false
       - key: AI_API_KEY
         sync: false
       - key: AI_ENABLED

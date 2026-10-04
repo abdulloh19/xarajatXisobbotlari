@@ -32,6 +32,28 @@ public class InlineKeyboardFactory {
                 .build();
     }
 
+    public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId) {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("📅 Kechagi foydadan", "draft:save_yesterday:" + draftId),
+                                new InlineKeyboardButton("📅 Bugungi foydadan", "draft:save_today:" + draftId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("✏️ Tahrirlash", "draft:edit:" + draftId),
+                                new InlineKeyboardButton("❌ Bekor qilish", "draft:cancel:" + draftId)
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type) {
+        if (type == TransactionType.EXPENSE) {
+            return getExpenseConfirmationKeyboard(draftId);
+        }
+        return getDraftConfirmationKeyboard(draftId);
+    }
+
     public InlineKeyboardMarkup getIntentSelectionKeyboard(Long draftId) {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(

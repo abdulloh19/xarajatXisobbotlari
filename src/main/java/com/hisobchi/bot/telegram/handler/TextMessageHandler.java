@@ -851,7 +851,7 @@ public class TextMessageHandler {
 
                 DraftDto dto = draftService.toDto(draft);
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
             case WAITING_AMOUNT_EDIT -> {
@@ -866,7 +866,7 @@ public class TextMessageHandler {
                     TransactionDraft draft = draftService.updateDraftAmount(draftOpt.get().getId(), user.getId(), amountOpt.get());
                     DraftDto dto = draftService.toDto(draft);
                     String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
@@ -876,7 +876,7 @@ public class TextMessageHandler {
                     TransactionDraft draft = draftService.updateDraftDescription(draftOpt.get().getId(), user.getId(), text);
                     DraftDto dto = draftService.toDto(draft);
                     String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
@@ -956,7 +956,7 @@ public class TextMessageHandler {
             if (category != null) {
                 DraftDto dto = draftService.toDto(draft);
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
             } else {
                 List<Category> categories = categoryService.getCategories(user.getId(), parsed.type());
                 String prompt = "✍️ <b>" + MoneyFormatter.format(parsed.amount()) + "</b> " +

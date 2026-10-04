@@ -105,7 +105,7 @@ public class VoiceMessageHandler {
             DraftDto dto = draftService.toDto(draft);
             String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
             apiClient.sendMessage(chatId, confirmMsg,
-                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId()), "HTML");
+                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
             return;
         }
 

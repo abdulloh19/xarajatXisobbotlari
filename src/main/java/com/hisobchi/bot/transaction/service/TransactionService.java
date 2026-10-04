@@ -30,7 +30,7 @@ public class TransactionService {
     private final DailySummaryService dailySummaryService;
 
     @Transactional
-    public TransactionDto confirmAndSave(Long draftId, Long userId) {
+    public TransactionDto confirmAndSaveWithDate(Long draftId, Long userId, LocalDate targetDate) {
         TransactionDraft draft = draftService.getDraft(draftId, userId);
 
         if (draft.getStatus() != DraftStatus.PENDING) {
@@ -42,11 +42,7 @@ public class TransactionService {
         }
 
         User user = draft.getUser();
-        LocalDate transactionDate = DateTimeUtils.today(user.getTimezone());
-
-        if (dailySummaryService.isDayClosed(userId, transactionDate)) {
-            throw new ValidationException("CLOSED_DAY:" + transactionDate);
-        }
+        LocalDate transactionDate = targetDate != null ? targetDate : DateTimeUtils.today(user.getTimezone());
 
         Transaction transaction = Transaction.builder()
                 .user(user)
@@ -62,10 +58,15 @@ public class TransactionService {
         Transaction saved = transactionRepository.save(transaction);
         draftService.markConfirmed(draft);
 
-        log.info("Transaction saved id: {}, user: {}, amount: {}, type: {}",
-                saved.getId(), userId, saved.getAmount(), saved.getType());
+        log.info("Transaction saved id: {}, user: {}, amount: {}, type: {}, date: {}",
+                saved.getId(), userId, saved.getAmount(), saved.getType(), transactionDate);
 
         return toDto(saved);
+    }
+
+    @Transactional
+    public TransactionDto confirmAndSave(Long draftId, Long userId) {
+        return confirmAndSaveWithDate(draftId, userId, null);
     }
 
     @Transactional(readOnly = true)

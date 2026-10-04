@@ -69,7 +69,30 @@ public final class BotMessageBuilder {
         }
 
         sb.append("📅 Sana:\n").append(DateTimeUtils.formatDateTime(draft.createdAt(), timezone)).append("\n\n");
-        sb.append("<b>Ma’lumot to‘g‘rimi?</b>");
+        if (draft.type() == TransactionType.EXPENSE) {
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n");
+            sb.append("<i>Kechagi yoki bugungi foydani tanlang:</i>");
+        } else {
+            sb.append("<b>Ma’lumot to‘g‘rimi?</b>");
+        }
+        return sb.toString();
+    }
+
+    public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("✅ <b>Saqlandi</b>\n\n");
+        if (fromYesterday) {
+            sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Kechagi foydadan ayirildi)\n");
+            sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("💸 Kechagi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
+            sb.append("✅ Kechagi yakuniy sof foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
+        } else {
+            sb.append("💸 ").append(MoneyFormatter.format(tx.amount())).append(" (Bugungi foydadan ayirildi)\n");
+            sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("💸 Bugungi xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
+            sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
+        }
         return sb.toString();
     }
 
