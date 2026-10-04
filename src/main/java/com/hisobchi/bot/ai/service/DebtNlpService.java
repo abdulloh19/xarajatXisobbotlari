@@ -33,10 +33,17 @@ public class DebtNlpService {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
-    // Pattern to capture entity immediately preceding "qarzman", "qarz oldim", etc.
-    // "moy qarzman", "benzin uchun qarzman", "moydan qarzman"
+    // Pattern to capture entity immediately preceding "qarz", "qarzman", "qarz oldim", etc.
+    // "moy qarz", "magazin qarz", "moy qarzman", "benzin uchun qarzman", "moydan qarzman"
     private static final Pattern PRE_DEBT_PATTERN = Pattern.compile(
-            "\\b([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)\\s+(?:uchun\\s+)?(?:qarzman|qarzdorman|qarz\\s+oldim|qarz\\s+olganman|qarz\\s+oganman)\\b",
+            "\\b([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)\\s+(?:uchun\\s+)?(?:qarzman|qarzdor|qarzdorman|qarz\\s+oldim|qarz\\s+olganman|qarz\\s+oganman|qarz\\s+boldim|qarz\\s+bo'ldim|qarz\\s+bo‘ldim|qarz|nasiya)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    // Pattern to capture entity immediately following "qarz", "qarzman", "nasiya", etc.
+    // "qarz magazin", "nasiya moy", "qarz Ali"
+    private static final Pattern POST_DEBT_PATTERN = Pattern.compile(
+            "\\b(?:qarz|qarzman|qarzdor|nasiya)\\s+(?:uchun\\s+)?([A-ZА-Яa-zа-я'‘`]+(?:\\s+(?:aka|opa|uka|singil|tog'a|toga|amaki|xola|pochcha))?)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
@@ -159,9 +166,17 @@ public class DebtNlpService {
             return DebtIntent.RETURN_PARTIAL;
         }
 
-        // 5. Creating BORROWED debt (User owes money / borrowed money):
-        // "250min qarzman", "moydan 250 ming qarzman", "qarz oldim", "qarz olganman", "qarz bo'ldim"
+        // 5. Creating LENT debt (User lent money to someone else):
+        if (lower.contains("qarz berdim") || lower.contains("qarzga berdim")
+                || (lower.contains("berdim") && !lower.contains("qarzimdan") && !lower.contains("hammasini") && (lower.contains("qarz") || lower.contains("nasiya")))
+                || lower.contains("qaytaradi") || lower.contains("berishi kerak")) {
+            return DebtIntent.LEND;
+        }
+
+        // 6. Creating BORROWED debt (User owes money / borrowed money):
+        // "250min qarzman", "moydan 250 ming qarzman", "25 ming magazindan qarz", "magazindan qarz", "qarz 50 ming", etc.
         if (lower.contains("qarzman")
+                || lower.contains("qarzdor")
                 || lower.contains("qarzdorman")
                 || lower.contains("qarz oldim")
                 || lower.contains("qarz olganman")
@@ -173,31 +188,21 @@ public class DebtNlpService {
                 || lower.contains("qarzga oldim")
                 || lower.contains("qarzga oganman")
                 || lower.contains("nasiyaga oldim")
+                || lower.contains("nasiyaga")
                 || lower.contains("nasiya")
-                || (lower.contains("qarz") && (lower.contains("oldim") || lower.contains("olganman") || lower.contains("oganman") || lower.contains("olindi") || lower.contains("olgan")))
-                || (lower.contains("oldim") && !lower.contains("berdim") && !lower.contains("qarz berdim"))) {
+                || lower.contains("berishim kerak")
+                || lower.contains("qaytaraman")
+                || lower.contains("qarzim bor")
+                || lower.contains("qarz")
+                || (lower.contains("oldim") && !lower.contains("berdim"))) {
             return DebtIntent.BORROW;
-        }
-
-        // 6. Creating LENT debt (User lent money to someone else):
-        if (lower.contains("qarz berdim") || lower.contains("qarzga berdim") || (lower.contains("berdim") && !lower.contains("qarzimdan") && !lower.contains("hammasini"))) {
-            return DebtIntent.LEND;
-        }
-
-        // Fallbacks
-        if (lower.contains("berishim kerak") || lower.contains("qaytaraman") || lower.contains("qarzim bor")) {
-            return DebtIntent.BORROW;
-        }
-
-        if (lower.contains("qaytaradi") || lower.contains("berishi kerak")) {
-            return DebtIntent.LEND;
         }
 
         return null;
     }
 
     private String extractPersonName(String text, String lower, DebtIntent intent) {
-        // 1. Suffix match: "Rustam akadan", "moydan", "zapravkadan", "do'kondan"
+        // 1. Suffix match: "Rustam akadan", "moydan", "zapravkadan", "magazindan", "do'kondan"
         Matcher suffixMatcher = PERSON_SUFFIX_PATTERN.matcher(text);
         while (suffixMatcher.find()) {
             String candidate = suffixMatcher.group(1).trim();
@@ -207,7 +212,7 @@ public class DebtNlpService {
             }
         }
 
-        // 2. Pre-debt match: "moy qarzman", "benzin uchun qarzman"
+        // 2. Pre-debt match: "moy qarz", "magazin qarz", "benzin uchun qarzman"
         Matcher preMatcher = PRE_DEBT_PATTERN.matcher(text);
         if (preMatcher.find()) {
             String candidate = preMatcher.group(1).trim();
@@ -217,7 +222,17 @@ public class DebtNlpService {
             }
         }
 
-        // 3. Leading person subject: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
+        // 3. Post-debt match: "qarz magazin", "nasiya Ali"
+        Matcher postMatcher = POST_DEBT_PATTERN.matcher(text);
+        if (postMatcher.find()) {
+            String candidate = postMatcher.group(1).trim();
+            String candLower = candidate.toLowerCase();
+            if (!isFilteredWord(candLower)) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        // 4. Leading person subject: "Javlon 600 ming qarz qaytardi", "Javlon hamma qarzini qaytardi"
         Matcher leadMatcher = LEADING_PERSON_PATTERN.matcher(text);
         if (leadMatcher.find()) {
             String candidate = leadMatcher.group(1).trim();

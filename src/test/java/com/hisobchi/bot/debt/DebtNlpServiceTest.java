@@ -176,4 +176,46 @@ class DebtNlpServiceTest {
         assertEquals("Zapravka", debt.personName());
         org.junit.jupiter.api.Assertions.assertFalse(debt.missingPerson());
     }
+
+    @Test
+    @DisplayName("Parse '25 ming magazindan qarz' -> BORROWED, 25 000, person='Magazin'")
+    void testParseMagazindanQarz() {
+        String text = "25 ming magazindan qarz";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(DebtType.BORROWED, debt.type());
+        assertEquals(new BigDecimal("25000"), debt.amount());
+        assertEquals("Magazin", debt.personName());
+        org.junit.jupiter.api.Assertions.assertFalse(debt.missingPerson());
+    }
+
+    @Test
+    @DisplayName("Parse 'magazindan 25 ming qarz' -> BORROWED, 25 000, person='Magazin'")
+    void testParseMagazindanPrefixQarz() {
+        String text = "magazindan 25 ming qarz";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(DebtType.BORROWED, debt.type());
+        assertEquals(new BigDecimal("25000"), debt.amount());
+        assertEquals("Magazin", debt.personName());
+        org.junit.jupiter.api.Assertions.assertFalse(debt.missingPerson());
+    }
+
+    @Test
+    @DisplayName("Parse '25 ming magazin qarz' -> BORROWED, 25 000, person='Magazin'")
+    void testParseMagazinPreQarz() {
+        String text = "25 ming magazin qarz";
+        Optional<ParsedDebt> result = debtNlpService.parse(text, zoneId);
+
+        assertTrue(result.isPresent());
+        ParsedDebt debt = result.get();
+        assertEquals(DebtType.BORROWED, debt.type());
+        assertEquals(new BigDecimal("25000"), debt.amount());
+        assertEquals("Magazin", debt.personName());
+        org.junit.jupiter.api.Assertions.assertFalse(debt.missingPerson());
+    }
 }

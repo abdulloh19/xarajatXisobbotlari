@@ -70,6 +70,16 @@ public class VoiceMessageHandler {
             return;
         }
 
+        // Safety guard: NEVER treat a debt-related utterance as an expense/income transaction
+        String lowerVoice = transcribedText.toLowerCase();
+        if (lowerVoice.contains("qarz") || lowerVoice.contains("nasiya")) {
+            apiClient.sendMessage(chatId,
+                    "🤝 <b>Qarz ma'lumoti</b> deb tushundim, lekin to‘liq aniqlab bo‘lmadi.\n\n" +
+                    "Iltimos, summani va kimdan/kimga ekanligini aniqroq ayting (masalan: <i>\"25 ming magazindan qarz\"</i> yoki <i>\"50 ming Aliga qarz berdim\"</i>):",
+                    replyKeyboardFactory.getDebtsMenu(), "HTML");
+            return;
+        }
+
         Optional<ParsedTransaction> parsedOpt = result.parsedTransaction();
 
         if (parsedOpt.isEmpty()) {

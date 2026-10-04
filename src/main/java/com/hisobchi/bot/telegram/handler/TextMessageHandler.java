@@ -966,6 +966,16 @@ public class TextMessageHandler {
             return;
         }
 
+        // Safety guard: NEVER treat a debt-related message as an expense/income transaction
+        String lowerText = text.toLowerCase();
+        if (lowerText.contains("qarz") || lowerText.contains("nasiya")) {
+            apiClient.sendMessage(chatId,
+                    "🤝 <b>Qarz ma'lumoti</b> deb tushundim, lekin to‘liq aniqlab bo‘lmadi.\n\n" +
+                    "Iltimos, summani va kimdan/kimga ekanligini aniqroq yozing (masalan: <i>\"25 ming magazindan qarz\"</i> yoki <i>\"50 ming Aliga qarz berdim\"</i>):",
+                    replyKeyboardFactory.getDebtsMenu(), "HTML");
+            return;
+        }
+
         // 2. Otherwise parse as standard transaction (expense/income)
         Optional<ParsedTransaction> parsedOpt = nlpService.parse(text);
         if (parsedOpt.isPresent()) {
