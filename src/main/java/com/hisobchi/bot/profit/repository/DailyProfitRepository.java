@@ -17,4 +17,6 @@ public interface DailyProfitRepository extends JpaRepository<DailyProfit, Long> 
 
     List<DailyProfit> findAllByUserIdAndProfitDateBetweenOrderByProfitDateAsc(
             Long userId, LocalDate startDate, LocalDate endDate);
+
+    List<DailyProfit> findAllByUserIdAndProfitDateLessThanOrderByProfitDateDesc(Long userId, LocalDate date);
 }

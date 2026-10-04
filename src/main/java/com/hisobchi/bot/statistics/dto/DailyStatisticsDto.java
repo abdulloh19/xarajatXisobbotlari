@@ -11,5 +11,10 @@ public record DailyStatisticsDto(
         BigDecimal netProfit,
         long transactionCount,
         List<CategoryExpenseDto> expenseCategories,
-        boolean isClosed
-) {}
+        boolean isClosed,
+        boolean isOffDay
+) {
+    public DailyStatisticsDto(LocalDate date, BigDecimal totalIncome, BigDecimal totalExpense, BigDecimal netProfit, long transactionCount, List<CategoryExpenseDto> expenseCategories, boolean isClosed) {
+        this(date, totalIncome, totalExpense, netProfit, transactionCount, expenseCategories, isClosed, false);
+    }
+}

@@ -59,8 +59,9 @@ public class StatisticsService {
         long count = transactionRepository.countByUserIdAndDate(user.getId(), date);
         List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, date);
         boolean isClosed = dailySummaryService.isDayClosed(user.getId(), date);
+        boolean isOffDay = dailyProfitService.isOffDay(user.getId(), date);
 
-        return new DailyStatisticsDto(date, totalEarned, totalExpense, netProfit, count, categories, isClosed);
+        return new DailyStatisticsDto(date, totalEarned, totalExpense, netProfit, count, categories, isClosed, isOffDay);
     }
 
     @Transactional(readOnly = true)

@@ -32,11 +32,45 @@ public class InlineKeyboardFactory {
                 .build();
     }
 
-    public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId) {
+    public InlineKeyboardMarkup getWorkDayConfirmationKeyboard() {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("📅 Kechagi foydadan", "draft:save_yesterday:" + draftId),
+                                new InlineKeyboardButton("✅ Ha, ishladim", "profit:work:yes"),
+                                new InlineKeyboardButton("🏖 Yo‘q, dam oldim", "profit:work:no")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "day:close:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId) {
+        return getExpenseConfirmationKeyboard(draftId, false, null);
+    }
+
+    public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId, boolean isOffDay, String lastWorkDayText) {
+        if (isOffDay) {
+            String label = (lastWorkDayText != null && !lastWorkDayText.isBlank())
+                    ? "📅 Oldingi ishlagan kundan (" + lastWorkDayText + ")"
+                    : "📅 Oldingi ishlagan kundan";
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton(label, "draft:save_yesterday:" + draftId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Tahrirlash", "draft:edit:" + draftId),
+                                    new InlineKeyboardButton("❌ Bekor qilish", "draft:cancel:" + draftId)
+                            )
+                    ))
+                    .build();
+        }
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("📅 Oldingi kundan", "draft:save_yesterday:" + draftId),
                                 new InlineKeyboardButton("📅 Bugungi foydadan", "draft:save_today:" + draftId)
                         ),
                         List.of(
@@ -48,8 +82,12 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type) {
+        return getDraftConfirmationKeyboard(draftId, type, false, null);
+    }
+
+    public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type, boolean isOffDay, String lastWorkDayText) {
         if (type == TransactionType.EXPENSE) {
-            return getExpenseConfirmationKeyboard(draftId);
+            return getExpenseConfirmationKeyboard(draftId, isOffDay, lastWorkDayText);
         }
         return getDraftConfirmationKeyboard(draftId);
     }

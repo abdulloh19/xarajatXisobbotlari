@@ -44,6 +44,10 @@ public class DailyProfit {
     @Builder.Default
     private BigDecimal totalProfit = BigDecimal.ZERO;
 
+    @Column(name = "is_work_day", nullable = false)
+    @Builder.Default
+    private boolean isWorkDay = true;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -36,6 +36,7 @@ public class VoiceMessageHandler {
     private final com.hisobchi.bot.ai.service.DebtNlpService debtNlpService;
     private final com.hisobchi.bot.debt.service.DebtDraftService debtDraftService;
 
+    private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
     private final com.hisobchi.bot.telegram.handler.DebtNlpHandler debtNlpHandler;
 
     public void handle(User user, Message message) {
@@ -113,9 +114,17 @@ public class VoiceMessageHandler {
             );
 
             DraftDto dto = draftService.toDto(draft);
-            String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
+            java.time.LocalDate today = com.hisobchi.bot.common.util.DateTimeUtils.today(user.getTimezone());
+            boolean isOffDay = dailyProfitService.isOffDay(user.getId(), today);
+            String lastWorkText = null;
+            if (isOffDay) {
+                lastWorkText = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                        .map(p -> com.hisobchi.bot.common.util.DateTimeUtils.formatUzbekDate(p.getProfitDate()))
+                        .orElse("oldingi ishlagan kun");
+            }
+            String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
             apiClient.sendMessage(chatId, confirmMsg,
-                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
+                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText), "HTML");
             return;
         }
 

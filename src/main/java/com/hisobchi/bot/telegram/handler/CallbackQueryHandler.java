@@ -767,10 +767,27 @@ public class CallbackQueryHandler {
 
     private void handleProfitCallback(User user, Long chatId, Integer messageId, String[] parts) {
         if ("enter".equals(parts[1])) {
-            userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
+            userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
             apiClient.sendMessage(chatId,
-                    "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
-                    replyKeyboardFactory.getCancelMenu(), "HTML");
+                    "💼 <b>Bugun ishladingizmi?</b>",
+                    inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
+        } else if ("work".equals(parts[1])) {
+            String choice = parts[2];
+            if ("yes".equals(choice)) {
+                apiClient.editMessageText(chatId, messageId, "✅ <b>Ish kuni</b> deb belgilandi.", null, "HTML");
+                userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
+                apiClient.sendMessage(chatId,
+                        "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
+                        replyKeyboardFactory.getCancelMenu(), "HTML");
+            } else if ("no".equals(choice)) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                dailyProfitService.markOffDay(user, today);
+                apiClient.editMessageText(chatId, messageId,
+                        "🏖 <b>Bugun dam!</b>\n\nMaroqli dam oling! Bugun qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                        null, "HTML");
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+            }
         }
     }
 
@@ -861,16 +878,32 @@ public class CallbackQueryHandler {
                 Category cat = categoryService.getById(categoryId, user.getId());
                 TransactionDraft draft = draftService.updateDraftCategory(draftId, user.getId(), cat);
                 DraftDto dto = draftService.toDto(draft);
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                boolean isOffDay = dailyProfitService.isOffDay(user.getId(), today);
+                String lastWorkText = null;
+                if (isOffDay) {
+                    lastWorkText = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                            .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
+                            .orElse("oldingi ishlagan kun");
+                }
+                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type()), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText), "HTML");
             }
             case "back" -> {
                 TransactionDraft d = draftService.getDraft(draftId, user.getId());
                 DraftDto dto = draftService.toDto(d);
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                boolean isOffDay = dailyProfitService.isOffDay(user.getId(), today);
+                String lastWorkText = null;
+                if (isOffDay) {
+                    lastWorkText = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                            .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
+                            .orElse("oldingi ishlagan kun");
+                }
+                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type()), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText), "HTML");
             }
             case "intent" -> {
                 String intentType = parts[3];
@@ -892,23 +925,44 @@ public class CallbackQueryHandler {
 
         try {
             LocalDate today = DateTimeUtils.today(user.getTimezone());
-            LocalDate targetDate = isYesterday ? today.minusDays(1) : today;
+            boolean isTodayOffDay = dailyProfitService.isOffDay(user.getId(), today);
 
-            TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), targetDate);
+            LocalDate txDate = today;
+            LocalDate profitDeductDate = today;
+            String sourceLabel = "Bugungi";
+            boolean isDeductedFromPrevious = isYesterday || isTodayOffDay;
 
-            // Deduct from profit for the target date
-            dailyProfitService.deductFromProfit(user, targetDate, saved.amount());
+            if (isDeductedFromPrevious) {
+                Optional<DailyProfit> lastWorkOpt = dailyProfitService.getLastWorkedDayProfit(user.getId(), today);
+                if (lastWorkOpt.isPresent()) {
+                    profitDeductDate = lastWorkOpt.get().getProfitDate();
+                    long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(profitDeductDate, today);
+                    if (daysBetween == 1) {
+                        sourceLabel = "Kechagi";
+                    } else {
+                        sourceLabel = "Oldingi ishlagan kun (" + profitDeductDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM")) + ")";
+                    }
+                } else {
+                    profitDeductDate = today.minusDays(1);
+                    sourceLabel = "Kechagi";
+                }
+            }
 
-            // Recalculate daily stats for targetDate
-            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, targetDate);
+            TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), txDate);
 
-            // If yesterday, re-save the closed summary for yesterday with updated numbers
-            if (isYesterday) {
-                dailySummaryService.closeDay(user, targetDate, targetStats.totalIncome(), targetStats.totalExpense(), targetStats.netProfit());
+            // Deduct from profit for profitDeductDate
+            dailyProfitService.deductFromProfit(user, profitDeductDate, saved.amount());
+
+            // Recalculate daily stats for profitDeductDate
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, profitDeductDate);
+
+            // If deducted from past day, update closed summary for that date
+            if (isDeductedFromPrevious) {
+                dailySummaryService.closeDay(user, profitDeductDate, targetStats.totalIncome(), targetStats.totalExpense(), targetStats.netProfit());
             }
 
             String successMsg = BotMessageBuilder.buildSaveSuccessMessageWithSource(
-                    saved, isYesterday, targetStats.totalExpense(), targetStats.totalIncome(), targetStats.netProfit());
+                    saved, isDeductedFromPrevious, sourceLabel, targetStats.totalExpense(), targetStats.totalIncome(), targetStats.netProfit());
 
             apiClient.editMessageText(chatId, messageId, successMsg,
                     inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");

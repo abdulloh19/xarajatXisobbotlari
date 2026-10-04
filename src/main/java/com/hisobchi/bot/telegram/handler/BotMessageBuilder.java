@@ -71,22 +71,33 @@ public final class BotMessageBuilder {
         sb.append("📅 Sana:\n").append(DateTimeUtils.formatDateTime(draft.createdAt(), timezone)).append("\n\n");
         if (draft.type() == TransactionType.EXPENSE) {
             sb.append("━━━━━━━━━━━━━━━━━━\n");
-            sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n");
-            sb.append("<i>Kechagi yoki bugungi foydani tanlang:</i>");
+            if (isOffDay) {
+                sb.append("🏖 <b>Bugun dam olish kuni.</b>\n");
+                String dayLabel = (lastWorkDayText != null && !lastWorkDayText.isBlank()) ? lastWorkDayText : "oldingi ishlagan kun";
+                sb.append("<i>Bu xarajat ").append(dayLabel).append(" foydasidan ayiriladi:</i>");
+            } else {
+                sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n");
+                sb.append("<i>Oldingi yoki bugungi foydani tanlang:</i>");
+            }
         } else {
             sb.append("<b>Ma’lumot to‘g‘rimi?</b>");
         }
         return sb.toString();
     }
 
-    public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {
+    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone) {
+        return buildDraftConfirmationMessage(draft, timezone, false, null);
+    }
+
+    public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, String profitSourceLabel, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {
         StringBuilder sb = new StringBuilder();
         sb.append("✅ <b>Saqlandi</b>\n\n");
+        String label = (profitSourceLabel != null && !profitSourceLabel.isBlank()) ? profitSourceLabel : (fromYesterday ? "Oldingi ishlagan kun" : "Bugungi");
         if (fromYesterday) {
-            sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Kechagi foydadan ayirildi)\n");
+            sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (").append(label).append(" foydasidan ayirildi)\n");
             sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
-            sb.append("💸 Kechagi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
-            sb.append("✅ Kechagi yakuniy sof foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
+            sb.append("💸 ").append(label).append(" umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
+            sb.append("✅ ").append(label).append(" yakuniy sof foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
         } else {
             sb.append("💸 ").append(MoneyFormatter.format(tx.amount())).append(" (Bugungi foydadan ayirildi)\n");
             sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
@@ -94,6 +105,10 @@ public final class BotMessageBuilder {
             sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
         }
         return sb.toString();
+    }
+
+    public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {
+        return buildSaveSuccessMessageWithSource(tx, fromYesterday, fromYesterday ? "Kechagi" : "Bugungi", totalExpense, totalIncome, netProfit);
     }
 
     public static String buildSaveSuccessMessage(TransactionDto tx, BigDecimal todayTotalExpense, BigDecimal todayTotalIncome, BigDecimal todayNetProfit) {
@@ -118,7 +133,11 @@ public final class BotMessageBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("📊 <b>BUGUNGI HISOBOT</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
-        sb.append("📅 ").append(DateTimeUtils.formatUzbekDate(stats.date())).append("\n\n");
+        sb.append("📅 ").append(DateTimeUtils.formatUzbekDate(stats.date()));
+        if (stats.isOffDay()) {
+            sb.append(" (🏖 Dam olish kuni)");
+        }
+        sb.append("\n\n");
         sb.append("💰 <b>Umumiy ishlab topilgan:</b>\n").append(MoneyFormatter.format(stats.totalIncome())).append("\n\n");
         sb.append("💸 <b>Xarajatlar:</b>\n").append(MoneyFormatter.format(stats.totalExpense())).append("\n\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n");

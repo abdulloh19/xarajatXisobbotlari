@@ -231,10 +231,10 @@ public class TextMessageHandler {
                 return;
             }
             case "💵 Foydani kiritish" -> {
-                userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
                 apiClient.sendMessage(chatId,
-                        "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
-                        replyKeyboardFactory.getCancelMenu(), "HTML");
+                        "💼 <b>Bugun ishladingizmi?</b>\n\nAgar bugun dam olgan bo‘lsangiz, xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                        inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
                 return;
             }
             case "🤝 Qarzlar", "📋 Qarzlar" -> {
@@ -415,6 +415,26 @@ public class TextMessageHandler {
         UserState state = user.getState();
 
         switch (state) {
+            case WAITING_WORK_DAY_CONFIRMATION -> {
+                String lower = text.trim().toLowerCase();
+                if (lower.contains("ha") || lower.contains("ishla") || lower.contains("yes") || lower.equals("+")) {
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
+                    apiClient.sendMessage(chatId,
+                            "💵 <b>Bugungi naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                } else if (lower.contains("yo'q") || lower.contains("yoq") || lower.contains("dam") || lower.contains("no") || lower.equals("-")) {
+                    LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    dailyProfitService.markOffDay(user, today);
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId,
+                            "🏖 <b>Bugun dam!</b>\n\nMaroqli dam oling! Bugun qilingan xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                            replyKeyboardFactory.getMainMenu(), "HTML");
+                } else {
+                    apiClient.sendMessage(chatId,
+                            "💼 <b>Iltimos, tanlang: Bugun ishladingizmi?</b>",
+                            inlineKeyboardFactory.getWorkDayConfirmationKeyboard(), "HTML");
+                }
+            }
             case WAITING_DAILY_PROFIT_CASH -> {
                 BigDecimal cash = BigDecimal.ZERO;
                 if (!"0".equals(text.trim())) {
@@ -883,9 +903,7 @@ public class TextMessageHandler {
                     draft.setDescription(text);
                 }
 
-                DraftDto dto = draftService.toDto(draft);
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
+                sendDraftConfirmation(user, chatId, draft);
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
             case WAITING_AMOUNT_EDIT -> {
@@ -898,9 +916,7 @@ public class TextMessageHandler {
                 Optional<TransactionDraft> draftOpt = draftService.getLatestPendingDraft(user.getId());
                 if (draftOpt.isPresent()) {
                     TransactionDraft draft = draftService.updateDraftAmount(draftOpt.get().getId(), user.getId(), amountOpt.get());
-                    DraftDto dto = draftService.toDto(draft);
-                    String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
+                    sendDraftConfirmation(user, chatId, draft);
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
@@ -908,9 +924,7 @@ public class TextMessageHandler {
                 Optional<TransactionDraft> draftOpt = draftService.getLatestPendingDraft(user.getId());
                 if (draftOpt.isPresent()) {
                     TransactionDraft draft = draftService.updateDraftDescription(draftOpt.get().getId(), user.getId(), text);
-                    DraftDto dto = draftService.toDto(draft);
-                    String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
+                    sendDraftConfirmation(user, chatId, draft);
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
@@ -998,9 +1012,7 @@ public class TextMessageHandler {
             );
 
             if (category != null) {
-                DraftDto dto = draftService.toDto(draft);
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone());
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
+                sendDraftConfirmation(user, chatId, draft);
             } else {
                 List<Category> categories = categoryService.getCategories(user.getId(), parsed.type());
                 String prompt = "✍️ <b>" + MoneyFormatter.format(parsed.amount()) + "</b> " +
@@ -1024,6 +1036,20 @@ public class TextMessageHandler {
 
     public void setActiveDebtDraftForEdit(Long userId, Long draftId) {
         userActiveDebtDraftId.put(userId, draftId);
+    }
+
+    private void sendDraftConfirmation(User user, Long chatId, TransactionDraft draft) {
+        DraftDto dto = draftService.toDto(draft);
+        LocalDate today = DateTimeUtils.today(user.getTimezone());
+        boolean isOffDay = dailyProfitService.isOffDay(user.getId(), today);
+        String lastWorkText = null;
+        if (isOffDay) {
+            lastWorkText = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                    .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
+                    .orElse("oldingi ishlagan kun");
+        }
+        String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
+        apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText), "HTML");
     }
 
     private boolean isCancelCommand(String text) {

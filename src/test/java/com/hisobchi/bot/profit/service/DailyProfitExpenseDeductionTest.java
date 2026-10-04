@@ -166,4 +166,97 @@ class DailyProfitExpenseDeductionTest {
         assertEquals("draft:save_yesterday:101", firstRow.get(0).getCallbackData());
         assertEquals("draft:save_today:101", firstRow.get(1).getCallbackData());
     }
+
+    @Test
+    @DisplayName("Expense confirmation keyboard on off-day only offers previous worked day option")
+    void testOffDayExpenseConfirmationKeyboard() {
+        InlineKeyboardMarkup keyboard = inlineKeyboardFactory.getDraftConfirmationKeyboard(101L, TransactionType.EXPENSE, true, "03.10");
+
+        assertNotNull(keyboard);
+        var rows = keyboard.getInlineKeyboard();
+        assertEquals(2, rows.size());
+
+        // First row: only previous worked day button
+        var firstRow = rows.get(0);
+        assertEquals(1, firstRow.size());
+        assertEquals("draft:save_yesterday:101", firstRow.get(0).getCallbackData());
+        assertTrue(firstRow.get(0).getText().contains("Oldingi ishlagan kundan"));
+        assertTrue(firstRow.get(0).getText().contains("03.10"));
+    }
+
+    @Test
+    @DisplayName("Work day confirmation keyboard has yes and no buttons")
+    void testWorkDayConfirmationKeyboard() {
+        InlineKeyboardMarkup keyboard = inlineKeyboardFactory.getWorkDayConfirmationKeyboard();
+
+        assertNotNull(keyboard);
+        var rows = keyboard.getInlineKeyboard();
+        assertEquals(2, rows.size());
+
+        var firstRow = rows.get(0);
+        assertEquals(2, firstRow.size());
+        assertEquals("profit:work:yes", firstRow.get(0).getCallbackData());
+        assertEquals("profit:work:no", firstRow.get(1).getCallbackData());
+    }
+
+    @Test
+    @DisplayName("markOffDay sets isWorkDay=false and zeroes profit")
+    void testMarkOffDay() {
+        LocalDate today = LocalDate.now();
+        DailyProfit existing = DailyProfit.builder()
+                .id(1L)
+                .user(testUser)
+                .profitDate(today)
+                .cashAmount(new BigDecimal("50000"))
+                .cardAmount(new BigDecimal("30000"))
+                .totalProfit(new BigDecimal("80000"))
+                .isWorkDay(true)
+                .build();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), today))
+                .thenReturn(Optional.of(existing));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        DailyProfit saved = dailyProfitService.markOffDay(testUser, today);
+
+        assertNotNull(saved);
+        assertFalse(saved.isWorkDay());
+        assertEquals(BigDecimal.ZERO, saved.getCashAmount());
+        assertEquals(BigDecimal.ZERO, saved.getCardAmount());
+        assertEquals(BigDecimal.ZERO, saved.getTotalProfit());
+        verify(balanceService, times(1)).updateDailyProfitDelta(testUser, new BigDecimal("-50000"), new BigDecimal("-30000"));
+    }
+
+    @Test
+    @DisplayName("getLastWorkedDayProfit retrieves the most recent working day with profit")
+    void testGetLastWorkedDayProfit() {
+        LocalDate today = LocalDate.of(2026, 10, 4);
+        LocalDate offDayYesterday = LocalDate.of(2026, 10, 3);
+        LocalDate workedDayBefore = LocalDate.of(2026, 10, 2);
+
+        DailyProfit pOff = DailyProfit.builder()
+                .user(testUser)
+                .profitDate(offDayYesterday)
+                .totalProfit(BigDecimal.ZERO)
+                .isWorkDay(false)
+                .build();
+
+        DailyProfit pWorked = DailyProfit.builder()
+                .user(testUser)
+                .profitDate(workedDayBefore)
+                .cashAmount(new BigDecimal("200000"))
+                .totalProfit(new BigDecimal("200000"))
+                .isWorkDay(true)
+                .build();
+
+        when(dailyProfitRepository.findAllByUserIdAndProfitDateLessThanOrderByProfitDateDesc(testUser.getId(), today))
+                .thenReturn(java.util.List.of(pOff, pWorked));
+
+        Optional<DailyProfit> result = dailyProfitService.getLastWorkedDayProfit(testUser.getId(), today);
+
+        assertTrue(result.isPresent());
+        assertEquals(workedDayBefore, result.get().getProfitDate());
+        assertEquals(new BigDecimal("200000"), result.get().getTotalProfit());
+    }
 }

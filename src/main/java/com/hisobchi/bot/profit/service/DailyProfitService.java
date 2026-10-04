@@ -38,6 +38,7 @@ public class DailyProfitService {
         BigDecimal deltaCash = safeCash.subtract(oldCash);
         BigDecimal deltaCard = safeCard.subtract(oldCard);
 
+        record.setWorkDay(true);
         record.setCashAmount(safeCash);
         record.setCardAmount(safeCard);
         record.setTotalProfit(total);
@@ -47,6 +48,52 @@ public class DailyProfitService {
         log.info("Saved daily profit for user {} on {}: cash={}, card={}, total={}",
                 user.getId(), date, safeCash, safeCard, total);
         return saved;
+    }
+
+    @Transactional
+    public DailyProfit markOffDay(User user, LocalDate date) {
+        DailyProfit record = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
+                .orElseGet(() -> DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .build());
+
+        BigDecimal oldCash = record.getCashAmount() != null ? record.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal oldCard = record.getCardAmount() != null ? record.getCardAmount() : BigDecimal.ZERO;
+        BigDecimal deltaCash = BigDecimal.ZERO.subtract(oldCash);
+        BigDecimal deltaCard = BigDecimal.ZERO.subtract(oldCard);
+
+        record.setWorkDay(false);
+        record.setCashAmount(BigDecimal.ZERO);
+        record.setCardAmount(BigDecimal.ZERO);
+        record.setTotalProfit(BigDecimal.ZERO);
+
+        DailyProfit saved = dailyProfitRepository.save(record);
+        balanceService.updateDailyProfitDelta(user, deltaCash, deltaCard);
+        log.info("Marked day {} as OFF DAY (dam olish) for user {}", date, user.getId());
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isOffDay(Long userId, LocalDate date) {
+        Optional<DailyProfit> p = dailyProfitRepository.findByUserIdAndProfitDate(userId, date);
+        return p.isPresent() && !p.get().isWorkDay();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<DailyProfit> getLastWorkedDayProfit(Long userId, LocalDate beforeDate) {
+        List<DailyProfit> list = dailyProfitRepository.findAllByUserIdAndProfitDateLessThanOrderByProfitDateDesc(userId, beforeDate);
+        for (DailyProfit p : list) {
+            if (p.isWorkDay() && p.getTotalProfit() != null && p.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+                return Optional.of(p);
+            }
+        }
+        for (DailyProfit p : list) {
+            if (p.isWorkDay()) {
+                return Optional.of(p);
+            }
+        }
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     @Transactional(readOnly = true)
