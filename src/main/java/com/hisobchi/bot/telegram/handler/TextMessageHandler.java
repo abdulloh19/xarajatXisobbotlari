@@ -132,7 +132,7 @@ public class TextMessageHandler {
 
         // 3. Handle Main Menu and Submenu button clicks
         switch (trimmed) {
-            case "💸 Xarajat qo‘shish" -> {
+            case "💸 Xarajat qo‘shish", "💸 Xarajat qo'shish", "Xarajat qo‘shish", "Xarajat qo'shish" -> {
                 userService.updateState(user.getTelegramId(), UserState.WAITING_EXPENSE_AMOUNT);
                 String msg = """
                         💵 <b>Xarajat miqdorini kiriting:</b>
@@ -147,7 +147,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
-            case "💰 Daromad qo‘shish" -> {
+            case "💰 Daromad qo‘shish", "💰 Daromad qo'shish", "Daromad qo‘shish", "Daromad qo'shish" -> {
                 userService.updateState(user.getTelegramId(), UserState.WAITING_INCOME_AMOUNT);
                 String msg = """
                         💰 <b>Bugungi daromad summasini kiriting:</b>
@@ -271,7 +271,7 @@ public class TextMessageHandler {
                         replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
-            case "💳 Qarz to‘lash" -> {
+            case "💳 Qarz to‘lash", "💳 Qarz to'lash", "Qarz to‘lash", "Qarz to'lash" -> {
                 List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
                 if (borrowed.isEmpty()) {
                     apiClient.sendMessage(chatId, "✅ Sizda to‘lanishi kerak bo‘lgan qarzlar yo‘q.", replyKeyboardFactory.getDebtsMenu(), null);
@@ -282,7 +282,7 @@ public class TextMessageHandler {
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
                 return;
             }
-            case "💵 Qarz qaytardi" -> {
+            case "💵 Qarz qaytardi", "Qarz qaytardi" -> {
                 List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
                 if (lent.isEmpty()) {
                     apiClient.sendMessage(chatId, "✅ Siz bergan faol qarzlar mavjud emas.", replyKeyboardFactory.getDebtsMenu(), null);
@@ -299,7 +299,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
                 return;
             }
-            case "📋 Men bergan qarzlar" -> {
+            case "📋 Men bergan qarzlar", "Men bergan qarzlar" -> {
                 List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
                 String msg = BotMessageBuilder.buildActiveDebtsList(lent, DebtType.LENT);
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
@@ -330,12 +330,20 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getDebtsMenu(), "HTML");
                 return;
             }
-            case "📊 Hisobotlar" -> {
+            case "📊 Hisobotlar", "Hisobotlar" -> {
                 apiClient.sendMessage(chatId, "📊 <b>Davriy hisobotlar:</b>\nKerakli davrni tanlang:",
                         replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "📆 Oxirgi 14 kun" -> {
+            case "📆 Oxirgi 7 kun", "📅 Oxirgi 7 kun", "Oxirgi 7 kun" -> {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(6);
+                ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
+                String msg = reportService.formatPeriodReport(data);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
+                return;
+            }
+            case "📆 Oxirgi 14 kun", "📅 Oxirgi 14 kun", "Oxirgi 14 kun" -> {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(13);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "2 HAFTALIK HISOBOT");
@@ -343,7 +351,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "📆 Oxirgi 21 kun" -> {
+            case "📆 Oxirgi 21 kun", "📅 Oxirgi 21 kun", "Oxirgi 21 kun" -> {
                 LocalDate end = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = end.minusDays(20);
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "3 HAFTALIK HISOBOT");
@@ -351,7 +359,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "🗓 O‘tgan oy" -> {
+            case "🗓 O‘tgan oy", "🗓 O'tgan oy", "📅 O‘tgan oy", "📅 O'tgan oy", "O‘tgan oy", "O'tgan oy" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 LocalDate prev = today.minusMonths(1);
                 LocalDate start = prev.withDayOfMonth(1);
@@ -362,47 +370,39 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "🔔 Eslatmalar" -> {
-                NotificationSettings s = notificationSettingsService.getOrCreateSettings(user);
-                String msg = "🔔 <b>Avtomatik eslatmalar va hisobotlar sozlamalari:</b>\n\nKerakli bandni yoqish yoki o‘chirish uchun ustiga bosing:";
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getNotificationSettingsKeyboard(s), "HTML");
+            case "🗓 Shu oy", "📅 Shu oy", "Shu oy" -> {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = today.withDayOfMonth(1);
+                String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
+                ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
+                String msg = reportService.formatPeriodReport(data);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getReportsMenu(), "HTML");
                 return;
             }
-            case "➕ Yangi kategoriya" -> {
-                userService.updateState(user.getTelegramId(), UserState.WAITING_NEW_CATEGORY_NAME);
-                apiClient.sendMessage(chatId, "Yangi kategoriya nomini kiriting (masalan: <i>Kutubxona</i>):",
-                        replyKeyboardFactory.getCancelMenu(), "HTML");
-                return;
-            }
-            case "📅 Bugun" -> {
+            case "📅 Bugun", "Bugun" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 ReportData report = reportService.getDailyReportData(user.getId(), today);
                 String msg = reportService.formatDailyReport(report, user.getId());
                 apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
                 return;
             }
-            case "📅 Kecha" -> {
+            case "📅 Kecha", "Kecha" -> {
                 LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
                 ReportData report = reportService.getDailyReportData(user.getId(), yesterday);
                 String msg = reportService.formatDailyReport(report);
                 apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(yesterday), "HTML");
                 return;
             }
-            case "📅 Oxirgi 7 kun" -> {
-                LocalDate end = DateTimeUtils.today(user.getTimezone());
-                LocalDate start = end.minusDays(6);
-                ReportData data = reportService.getPeriodReportData(user.getId(), start, end, "HAFTALIK HISOBOT");
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getHistoryMenu(), "HTML");
+            case "🔔 Eslatmalar", "Eslatmalar" -> {
+                NotificationSettings s = notificationSettingsService.getOrCreateSettings(user);
+                String msg = "🔔 <b>Avtomatik eslatmalar va hisobotlar sozlamalari:</b>\n\nKerakli bandni yoqish yoki o‘chirish uchun ustiga bosing:";
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getNotificationSettingsKeyboard(s), "HTML");
                 return;
             }
-            case "🗓 Shu oy" -> {
-                LocalDate today = DateTimeUtils.today(user.getTimezone());
-                LocalDate start = today.withDayOfMonth(1);
-                String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
-                ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
-                String msg = reportService.formatPeriodReport(data);
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getHistoryMenu(), "HTML");
+            case "➕ Yangi kategoriya", "Yangi kategoriya" -> {
+                userService.updateState(user.getTelegramId(), UserState.WAITING_NEW_CATEGORY_NAME);
+                apiClient.sendMessage(chatId, "Yangi kategoriya nomini kiriting (masalan: <i>Kutubxona</i>):",
+                        replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
         }
