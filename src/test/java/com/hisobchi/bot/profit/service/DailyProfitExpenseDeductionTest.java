@@ -259,4 +259,58 @@ class DailyProfitExpenseDeductionTest {
         assertEquals(workedDayBefore, result.get().getProfitDate());
         assertEquals(new BigDecimal("200000"), result.get().getTotalProfit());
     }
+
+    @Test
+    @DisplayName("subtractFromProfit: 500 000 minus 100 000 results in 400 000 profit")
+    void testSubtractFromProfit() {
+        LocalDate today = LocalDate.of(2026, 10, 4);
+        DailyProfit current = DailyProfit.builder()
+                .id(10L)
+                .user(testUser)
+                .profitDate(today)
+                .cashAmount(new BigDecimal("500000"))
+                .cardAmount(BigDecimal.ZERO)
+                .totalProfit(new BigDecimal("500000"))
+                .isWorkDay(true)
+                .build();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), today))
+                .thenReturn(Optional.of(current));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        DailyProfit updated = dailyProfitService.subtractFromProfit(testUser, today, new BigDecimal("100000"));
+
+        assertNotNull(updated);
+        assertEquals(new BigDecimal("400000"), updated.getCashAmount());
+        assertEquals(new BigDecimal("400000"), updated.getTotalProfit());
+        verify(balanceService).updateDailyProfitDelta(eq(testUser), eq(new BigDecimal("-100000")), eq(BigDecimal.ZERO));
+    }
+
+    @Test
+    @DisplayName("addToProfit: 500 000 plus 100 000 results in 600 000 profit")
+    void testAddToProfit() {
+        LocalDate today = LocalDate.of(2026, 10, 4);
+        DailyProfit current = DailyProfit.builder()
+                .id(10L)
+                .user(testUser)
+                .profitDate(today)
+                .cashAmount(new BigDecimal("500000"))
+                .cardAmount(BigDecimal.ZERO)
+                .totalProfit(new BigDecimal("500000"))
+                .isWorkDay(true)
+                .build();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), today))
+                .thenReturn(Optional.of(current));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        DailyProfit updated = dailyProfitService.addToProfit(testUser, today, new BigDecimal("100000"));
+
+        assertNotNull(updated);
+        assertEquals(new BigDecimal("600000"), updated.getCashAmount());
+        assertEquals(new BigDecimal("600000"), updated.getTotalProfit());
+        verify(balanceService).updateDailyProfitDelta(eq(testUser), eq(new BigDecimal("100000")), eq(BigDecimal.ZERO));
+    }
 }

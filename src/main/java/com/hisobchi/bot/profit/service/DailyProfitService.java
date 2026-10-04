@@ -135,4 +135,53 @@ public class DailyProfitService {
                     amount, user.getId(), date, newCash.add(newCard));
         }
     }
+
+    @Transactional
+    public DailyProfit addToProfit(User user, LocalDate date, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return getProfit(user.getId(), date).orElse(null);
+        }
+        DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
+                .orElseGet(() -> DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .isWorkDay(true)
+                        .build());
+        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+
+        BigDecimal newCash = currentCash.add(amount);
+        DailyProfit updated = saveOrUpdateProfit(user, date, newCash, currentCard);
+        log.info("Added {} to profit for user {} on {}: new total={}", amount, user.getId(), date, updated.getTotalProfit());
+        return updated;
+    }
+
+    @Transactional
+    public DailyProfit subtractFromProfit(User user, LocalDate date, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return getProfit(user.getId(), date).orElse(null);
+        }
+        DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
+                .orElseGet(() -> DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .isWorkDay(true)
+                        .build());
+        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+
+        BigDecimal newCash = currentCash.subtract(amount);
+        BigDecimal newCard = currentCard;
+        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal deficit = newCash.abs();
+            newCash = BigDecimal.ZERO;
+            newCard = currentCard.subtract(deficit);
+            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
+                newCard = BigDecimal.ZERO;
+            }
+        }
+        DailyProfit updated = saveOrUpdateProfit(user, date, newCash, newCard);
+        log.info("Subtracted {} from profit for user {} on {}: new total={}", amount, user.getId(), date, updated.getTotalProfit());
+        return updated;
+    }
 }

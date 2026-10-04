@@ -269,11 +269,7 @@ public class TextMessageHandler {
             }
             case "💵 Foydani kiritish", "Foydani kiritish" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
-                setProfitTargetDate(user.getId(), today);
-                userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
-                apiClient.sendMessage(chatId,
-                        "💼 <b>Bugun ishladingizmi?</b>\n\nAgar bugun dam olgan bo‘lsangiz, xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
-                        inlineKeyboardFactory.getWorkDayConfirmationKeyboard(today), "HTML");
+                initiateProfitFlow(user, chatId, today);
                 return;
             }
             case "🤝 Qarzlar", "📋 Qarzlar" -> {
@@ -591,6 +587,80 @@ public class TextMessageHandler {
                 );
 
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+            }
+            case WAITING_PROFIT_ADD_AMOUNT -> {
+                Optional<BigDecimal> amt = amountParser.parse(text);
+                if (amt.isEmpty() || amt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ Iltimos, to‘g‘ri summa kiriting (masalan: <code>100000</code> yoki <code>100 ming</code>):",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                BigDecimal addAmount = amt.get();
+                LocalDate targetDate = removeProfitTargetDate(user.getId());
+                if (targetDate == null) {
+                    targetDate = DateTimeUtils.today(user.getTimezone());
+                }
+                DailyProfit oldProfit = dailyProfitService.getProfit(user.getId(), targetDate).orElse(null);
+                BigDecimal oldTotal = (oldProfit != null && oldProfit.getTotalProfit() != null) ? oldProfit.getTotalProfit() : BigDecimal.ZERO;
+
+                DailyProfit updated = dailyProfitService.addToProfit(user, targetDate, addAmount);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+                String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone())) ? "Bugungi" : DateTimeUtils.formatUzbekDate(targetDate);
+                String msg = String.format("""
+                        ✅ <b>%s foydaga summa qo‘shildi!</b>
+
+                        📌 Oldingi foyda: <b>%s</b>
+                        ➕ Qo‘shildi: <b>%s</b>
+                        ━━━━━━━━━━━━━━━━━━
+                        ✅ <b>Yangi foyda:</b> <b>%s</b>
+                        <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
+                        """,
+                        dateLabel,
+                        MoneyFormatter.format(oldTotal),
+                        MoneyFormatter.format(addAmount),
+                        MoneyFormatter.format(updated != null ? updated.getTotalProfit() : oldTotal.add(addAmount)),
+                        MoneyFormatter.format(updated != null ? updated.getCashAmount() : BigDecimal.ZERO),
+                        MoneyFormatter.format(updated != null ? updated.getCardAmount() : BigDecimal.ZERO)
+                );
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+            }
+            case WAITING_PROFIT_SUBTRACT_AMOUNT -> {
+                Optional<BigDecimal> amt = amountParser.parse(text);
+                if (amt.isEmpty() || amt.get().compareTo(BigDecimal.ZERO) <= 0) {
+                    apiClient.sendMessage(chatId, "⚠️ Iltimos, to‘g‘ri summa kiriting (masalan: <code>100000</code> yoki <code>100 ming</code>):",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                    return;
+                }
+                BigDecimal subAmount = amt.get();
+                LocalDate targetDate = removeProfitTargetDate(user.getId());
+                if (targetDate == null) {
+                    targetDate = DateTimeUtils.today(user.getTimezone());
+                }
+                DailyProfit oldProfit = dailyProfitService.getProfit(user.getId(), targetDate).orElse(null);
+                BigDecimal oldTotal = (oldProfit != null && oldProfit.getTotalProfit() != null) ? oldProfit.getTotalProfit() : BigDecimal.ZERO;
+
+                DailyProfit updated = dailyProfitService.subtractFromProfit(user, targetDate, subAmount);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+                String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone())) ? "Bugungi" : DateTimeUtils.formatUzbekDate(targetDate);
+                String msg = String.format("""
+                        ✅ <b>%s foydadan summa ayirildi (minus qilindi)!</b>
+
+                        📌 Oldingi foyda: <b>%s</b>
+                        ➖ Ayirildi: <b>%s</b>
+                        ━━━━━━━━━━━━━━━━━━
+                        ✅ <b>Yangi foyda:</b> <b>%s</b>
+                        <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
+                        """,
+                        dateLabel,
+                        MoneyFormatter.format(oldTotal),
+                        MoneyFormatter.format(subAmount),
+                        MoneyFormatter.format(updated != null ? updated.getTotalProfit() : oldTotal.subtract(subAmount).max(BigDecimal.ZERO)),
+                        MoneyFormatter.format(updated != null ? updated.getCashAmount() : BigDecimal.ZERO),
+                        MoneyFormatter.format(updated != null ? updated.getCardAmount() : BigDecimal.ZERO)
+                );
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
             }
             case WAITING_LENT_PERSON -> {
@@ -1140,6 +1210,52 @@ public class TextMessageHandler {
             }
         }
 
+        // Quick natural command for adding/subtracting from profit
+        if (lowerText.contains("foyda") && (lowerText.contains("minus") || lowerText.contains("ayir")
+                || lowerText.contains("kamayt") || lowerText.contains("qosh") || lowerText.contains("qo'sh") || lowerText.contains("qo‘sh"))) {
+            Optional<BigDecimal> amtOpt = amountParser.parse(text);
+            if (amtOpt.isPresent() && amtOpt.get().compareTo(BigDecimal.ZERO) > 0) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                DailyProfit oldProfit = dailyProfitService.getProfit(user.getId(), today).orElse(null);
+                BigDecimal oldTotal = (oldProfit != null && oldProfit.getTotalProfit() != null) ? oldProfit.getTotalProfit() : BigDecimal.ZERO;
+                BigDecimal changeAmt = amtOpt.get();
+
+                if (lowerText.contains("minus") || lowerText.contains("ayir") || lowerText.contains("kamayt")) {
+                    DailyProfit updated = dailyProfitService.subtractFromProfit(user, today, changeAmt);
+                    String msg = String.format("""
+                            ✅ <b>Bugungi foydadan ayirildi (minus qilindi)!</b>
+
+                            📌 Oldingi foyda: <b>%s</b>
+                            ➖ Ayirildi: <b>%s</b>
+                            ━━━━━━━━━━━━━━━━━━
+                            ✅ <b>Yangi foyda:</b> <b>%s</b>
+                            """,
+                            MoneyFormatter.format(oldTotal),
+                            MoneyFormatter.format(changeAmt),
+                            MoneyFormatter.format(updated != null ? updated.getTotalProfit() : oldTotal.subtract(changeAmt).max(BigDecimal.ZERO))
+                    );
+                    apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+                    return;
+                } else {
+                    DailyProfit updated = dailyProfitService.addToProfit(user, today, changeAmt);
+                    String msg = String.format("""
+                            ✅ <b>Bugungi foydaga qo‘shildi!</b>
+
+                            📌 Oldingi foyda: <b>%s</b>
+                            ➕ Qo‘shildi: <b>%s</b>
+                            ━━━━━━━━━━━━━━━━━━
+                            ✅ <b>Yangi foyda:</b> <b>%s</b>
+                            """,
+                            MoneyFormatter.format(oldTotal),
+                            MoneyFormatter.format(changeAmt),
+                            MoneyFormatter.format(updated != null ? updated.getTotalProfit() : oldTotal.add(changeAmt))
+                    );
+                    apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+                    return;
+                }
+            }
+        }
+
         // 2. Otherwise parse as standard transaction (expense/income)
         Optional<ParsedTransaction> parsedOpt = nlpService.parse(text);
         if (parsedOpt.isPresent()) {
@@ -1181,6 +1297,40 @@ public class TextMessageHandler {
                     ✍️ <i>"Rustam akadan 2 million qarz oldim, keyingi haftagacha"</i>
                     """;
             apiClient.sendMessage(chatId, unknown, replyKeyboardFactory.getMainMenu(), "HTML");
+        }
+    }
+
+    public void initiateProfitFlow(User user, Long chatId, LocalDate targetDate) {
+        setProfitTargetDate(user.getId(), targetDate);
+        Optional<DailyProfit> existingOpt = dailyProfitService.getProfit(user.getId(), targetDate);
+        String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
+                ? "Bugungi"
+                : DateTimeUtils.formatUzbekDate(targetDate);
+
+        if (existingOpt.isPresent() && existingOpt.get().isWorkDay()
+                && existingOpt.get().getTotalProfit() != null
+                && existingOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+            DailyProfit existing = existingOpt.get();
+            String msg = String.format("""
+                    💰 <b>%s foyda:</b> <b>%s</b>
+                    <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
+
+                    Foydani o‘zgartirish uchun amalni tanlang:
+                    ➕ <b>Qo‘shish</b> — mavjud foydaga summa qo‘shish
+                    ➖ <b>Minus qilish</b> — foydadan summa ayirish
+                    ✏️ <b>Yangitdan kiritish</b> — yangi summa bilan to‘liq almashtirish
+                    """,
+                    dateLabel,
+                    MoneyFormatter.format(existing.getTotalProfit()),
+                    MoneyFormatter.format(existing.getCashAmount()),
+                    MoneyFormatter.format(existing.getCardAmount())
+            );
+            apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getProfitEditOptionsKeyboard(targetDate), "HTML");
+        } else {
+            userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
+            apiClient.sendMessage(chatId,
+                    "💼 <b>" + dateLabel + " ishladingizmi?</b>\n\nAgar dam olgan bo‘lsangiz, xarajatlar oldingi ishlagan kuningiz foydasidan hisoblanadi.",
+                    inlineKeyboardFactory.getWorkDayConfirmationKeyboard(targetDate), "HTML");
         }
     }
 

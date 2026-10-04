@@ -661,4 +661,22 @@ public class InlineKeyboardFactory {
                 ))
                 .build();
     }
+
+    public InlineKeyboardMarkup getProfitEditOptionsKeyboard(LocalDate date) {
+        String dateStr = date.toString();
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("➕ Qo‘shish (+)", "profit:op:add:" + dateStr),
+                                new InlineKeyboardButton("➖ Minus qilish (-)", "profit:op:sub:" + dateStr)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("✏️ Yangitdan kiritish", "profit:op:edit:" + dateStr)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "profit:op:cancel")
+                        )
+                ))
+                .build();
+    }
 }

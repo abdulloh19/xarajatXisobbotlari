@@ -792,15 +792,64 @@ public class CallbackQueryHandler {
 
     private void handleProfitCallback(User user, Long chatId, Integer messageId, String[] parts) {
         if ("enter".equals(parts[1])) {
-            LocalDate targetDate = (parts.length > 2) ? LocalDate.parse(parts[2]) : DateTimeUtils.today(user.getTimezone());
+            LocalDate targetDate = (parts.length > 2 && !parts[2].isBlank()) ? LocalDate.parse(parts[2]) : DateTimeUtils.today(user.getTimezone());
+            textMessageHandler.initiateProfitFlow(user, chatId, targetDate);
+        } else if ("op".equals(parts[1])) {
+            String op = parts[2];
+            if ("cancel".equals(op)) {
+                textMessageHandler.removeProfitTargetDate(user.getId());
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+                return;
+            }
+            LocalDate targetDate = (parts.length > 3 && !parts[3].isBlank())
+                    ? LocalDate.parse(parts[3])
+                    : textMessageHandler.getProfitTargetDate(user.getId());
+            if (targetDate == null) {
+                targetDate = DateTimeUtils.today(user.getTimezone());
+            }
             textMessageHandler.setProfitTargetDate(user.getId(), targetDate);
-            userService.updateState(user.getTelegramId(), UserState.WAITING_WORK_DAY_CONFIRMATION);
             String dateLabel = targetDate.equals(DateTimeUtils.today(user.getTimezone()))
-                    ? "Bugun"
+                    ? "Bugungi"
                     : DateTimeUtils.formatUzbekDate(targetDate);
-            apiClient.sendMessage(chatId,
-                    "💼 <b>" + dateLabel + " ishladingizmi?</b>",
-                    inlineKeyboardFactory.getWorkDayConfirmationKeyboard(targetDate), "HTML");
+            Optional<DailyProfit> existingOpt = dailyProfitService.getProfit(user.getId(), targetDate);
+            BigDecimal currentTotal = existingOpt.map(DailyProfit::getTotalProfit).orElse(BigDecimal.ZERO);
+
+            switch (op) {
+                case "add" -> {
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_PROFIT_ADD_AMOUNT);
+                    String prompt = String.format("""
+                            ➕ <b>Foydaga qancha qo‘shmoqchisiz?</b>
+
+                            📌 Joriy foyda: <b>%s</b>
+
+                            Qo‘shiladigan summani kiriting:
+                            <i>Masalan: 100000 yoki 100 ming</i>
+                            """, MoneyFormatter.format(currentTotal));
+                    apiClient.editMessageText(chatId, messageId, "➕ <b>Qo‘shish amali tanlandi.</b>", null, "HTML");
+                    apiClient.sendMessage(chatId, prompt, replyKeyboardFactory.getCancelMenu(), "HTML");
+                }
+                case "sub" -> {
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_PROFIT_SUBTRACT_AMOUNT);
+                    String prompt = String.format("""
+                            ➖ <b>Foydadan qancha ayirmoqchisiz (minus qilmoqchisiz)?</b>
+
+                            📌 Joriy foyda: <b>%s</b>
+
+                            Ayiriladigan summani kiriting:
+                            <i>Masalan: 100000 yoki 100 ming</i>
+                            """, MoneyFormatter.format(currentTotal));
+                    apiClient.editMessageText(chatId, messageId, "➖ <b>Minus qilish amali tanlandi.</b>", null, "HTML");
+                    apiClient.sendMessage(chatId, prompt, replyKeyboardFactory.getCancelMenu(), "HTML");
+                }
+                case "edit" -> {
+                    userService.updateState(user.getTelegramId(), UserState.WAITING_DAILY_PROFIT_CASH);
+                    apiClient.editMessageText(chatId, messageId, "✏️ <b>Yangitdan kiritish tanlandi.</b>", null, "HTML");
+                    apiClient.sendMessage(chatId,
+                            "💵 <b>" + dateLabel + " naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
+                            replyKeyboardFactory.getCancelMenu(), "HTML");
+                }
+            }
         } else if ("work".equals(parts[1])) {
             String choice = parts[2];
             LocalDate targetDate = (parts.length > 3)
