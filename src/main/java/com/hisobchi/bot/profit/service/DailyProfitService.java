@@ -13,6 +13,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import com.hisobchi.bot.transaction.entity.TransactionType;
+import com.hisobchi.bot.transaction.repository.TransactionRepository;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class DailyProfitService {
 
     private final DailyProfitRepository dailyProfitRepository;
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
+    private final TransactionRepository transactionRepository;
 
     @Transactional
     public DailyProfit saveOrUpdateProfit(User user, LocalDate date, BigDecimal cash, BigDecimal card) {
@@ -115,25 +119,35 @@ public class DailyProfitService {
     public void deductFromProfit(User user, LocalDate date, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
         Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
+        DailyProfit p;
         if (profitOpt.isPresent()) {
-            DailyProfit p = profitOpt.get();
-            BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
-            BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
-
-            BigDecimal newCash = currentCash.subtract(amount);
-            BigDecimal newCard = currentCard;
-            if (newCash.compareTo(BigDecimal.ZERO) < 0) {
-                BigDecimal deficit = newCash.abs();
-                newCash = BigDecimal.ZERO;
-                newCard = currentCard.subtract(deficit);
-                if (newCard.compareTo(BigDecimal.ZERO) < 0) {
-                    newCard = BigDecimal.ZERO;
-                }
-            }
-            saveOrUpdateProfit(user, date, newCash, newCard);
-            log.info("Deducted {} from profit for user {} on {}: new total={}",
-                    amount, user.getId(), date, newCash.add(newCard));
+            p = profitOpt.get();
+        } else {
+            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+            p = DailyProfit.builder()
+                    .user(user)
+                    .profitDate(date)
+                    .cashAmount(inc != null ? inc : BigDecimal.ZERO)
+                    .cardAmount(BigDecimal.ZERO)
+                    .isWorkDay(true)
+                    .build();
         }
+        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+
+        BigDecimal newCash = currentCash.subtract(amount);
+        BigDecimal newCard = currentCard;
+        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal deficit = newCash.abs();
+            newCash = BigDecimal.ZERO;
+            newCard = currentCard.subtract(deficit);
+            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
+                newCard = BigDecimal.ZERO;
+            }
+        }
+        saveOrUpdateProfit(user, date, newCash, newCard);
+        log.info("Deducted {} from profit for user {} on {}: new total={}",
+                amount, user.getId(), date, newCash.add(newCard));
     }
 
     @Transactional
@@ -162,11 +176,16 @@ public class DailyProfitService {
             return getProfit(user.getId(), date).orElse(null);
         }
         DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
-                .orElseGet(() -> DailyProfit.builder()
-                        .user(user)
-                        .profitDate(date)
-                        .isWorkDay(true)
-                        .build());
+                .orElseGet(() -> {
+                    BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+                    return DailyProfit.builder()
+                            .user(user)
+                            .profitDate(date)
+                            .cashAmount(inc != null ? inc : BigDecimal.ZERO)
+                            .cardAmount(BigDecimal.ZERO)
+                            .isWorkDay(true)
+                            .build();
+                });
         BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
         BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
 
@@ -183,5 +202,30 @@ public class DailyProfitService {
         DailyProfit updated = saveOrUpdateProfit(user, date, newCash, newCard);
         log.info("Subtracted {} from profit for user {} on {}: new total={}", amount, user.getId(), date, updated.getTotalProfit());
         return updated;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasEnteredProfitToday(User user, LocalDate today) {
+        Optional<DailyProfit> todayProfitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), today);
+        if (todayProfitOpt.isPresent()
+                && todayProfitOpt.get().isWorkDay()
+                && todayProfitOpt.get().getTotalProfit() != null
+                && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+            return true;
+        }
+        BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today);
+        return inc != null && inc.compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getTodayProfitOrIncome(User user, LocalDate today) {
+        Optional<DailyProfit> todayProfitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), today);
+        if (todayProfitOpt.isPresent()
+                && todayProfitOpt.get().isWorkDay()
+                && todayProfitOpt.get().getTotalProfit() != null) {
+            return todayProfitOpt.get().getTotalProfit();
+        }
+        BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today);
+        return inc != null ? inc : BigDecimal.ZERO;
     }
 }

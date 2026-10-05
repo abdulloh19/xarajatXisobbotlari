@@ -1053,11 +1053,7 @@ public class CallbackQueryHandler {
                             .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                             .orElse("oldingi ishlagan kun");
                 }
-                Optional<DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
-                boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
-                        && todayProfitOpt.get().isWorkDay()
-                        && todayProfitOpt.get().getTotalProfit() != null
-                        && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+                boolean hasEnteredProfitToday = dailyProfitService.hasEnteredProfitToday(user, today);
 
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
                 apiClient.editMessageText(chatId, messageId, msg,
@@ -1074,11 +1070,7 @@ public class CallbackQueryHandler {
                             .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                             .orElse("oldingi ishlagan kun");
                 }
-                Optional<DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
-                boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
-                        && todayProfitOpt.get().isWorkDay()
-                        && todayProfitOpt.get().getTotalProfit() != null
-                        && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+                boolean hasEnteredProfitToday = dailyProfitService.hasEnteredProfitToday(user, today);
 
                 String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
                 apiClient.editMessageText(chatId, messageId, msg,

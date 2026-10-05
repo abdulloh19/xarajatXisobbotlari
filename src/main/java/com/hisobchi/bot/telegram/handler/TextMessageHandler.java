@@ -1382,6 +1382,12 @@ public class TextMessageHandler {
                         ? (saved.getCategory().getEmoji() != null ? saved.getCategory().getEmoji() + " " : "") + saved.getCategory().getName()
                         : "Xarajat";
 
+                BigDecimal todayProfitVal = (updatedProfit != null && updatedProfit.getTotalProfit() != null)
+                        ? updatedProfit.getTotalProfit()
+                        : dailyProfitService.getTodayProfitOrIncome(user, today);
+                BigDecimal cashVal = updatedProfit != null ? updatedProfit.getCashAmount() : todayProfitVal;
+                BigDecimal cardVal = updatedProfit != null ? updatedProfit.getCardAmount() : BigDecimal.ZERO;
+
                 String msg = String.format("""
                         ✅ <b>Xarajat bugungi foydadan ayirildi va saqlandi!</b>
 
@@ -1397,9 +1403,9 @@ public class TextMessageHandler {
                         MoneyFormatter.format(saved.getAmount()),
                         catName,
                         MoneyFormatter.format(stats.totalIncome()),
-                        MoneyFormatter.format(updatedProfit != null ? updatedProfit.getTotalProfit() : BigDecimal.ZERO),
-                        MoneyFormatter.format(updatedProfit != null ? updatedProfit.getCashAmount() : BigDecimal.ZERO),
-                        MoneyFormatter.format(updatedProfit != null ? updatedProfit.getCardAmount() : BigDecimal.ZERO),
+                        MoneyFormatter.format(todayProfitVal),
+                        MoneyFormatter.format(cashVal),
+                        MoneyFormatter.format(cardVal),
                         MoneyFormatter.format(stats.totalExpense())
                 );
 
@@ -1486,11 +1492,7 @@ public class TextMessageHandler {
                     .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                     .orElse("oldingi ishlagan kun");
         }
-        Optional<DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
-        boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
-                && todayProfitOpt.get().isWorkDay()
-                && todayProfitOpt.get().getTotalProfit() != null
-                && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+        boolean hasEnteredProfitToday = dailyProfitService.hasEnteredProfitToday(user, today);
 
         String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
         apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText, hasEnteredProfitToday), "HTML");

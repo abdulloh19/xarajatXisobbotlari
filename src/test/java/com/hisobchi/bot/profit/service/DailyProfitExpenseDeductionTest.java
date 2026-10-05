@@ -53,7 +53,7 @@ class DailyProfitExpenseDeductionTest {
 
     @BeforeEach
     void setUp() {
-        dailyProfitService = new DailyProfitService(dailyProfitRepository, balanceService);
+        dailyProfitService = new DailyProfitService(dailyProfitRepository, balanceService, transactionRepository);
         transactionService = new TransactionService(transactionRepository, draftService, dailySummaryService);
         inlineKeyboardFactory = new InlineKeyboardFactory();
 

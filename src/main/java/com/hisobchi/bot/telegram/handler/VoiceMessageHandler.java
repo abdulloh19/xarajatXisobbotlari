@@ -129,11 +129,7 @@ public class VoiceMessageHandler {
                         .map(p -> com.hisobchi.bot.common.util.DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                         .orElse("oldingi ishlagan kun");
             }
-            java.util.Optional<com.hisobchi.bot.profit.entity.DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
-            boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
-                    && todayProfitOpt.get().isWorkDay()
-                    && todayProfitOpt.get().getTotalProfit() != null
-                    && todayProfitOpt.get().getTotalProfit().compareTo(java.math.BigDecimal.ZERO) > 0;
+            boolean hasEnteredProfitToday = dailyProfitService.hasEnteredProfitToday(user, today);
 
             String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
             apiClient.sendMessage(chatId, confirmMsg,
