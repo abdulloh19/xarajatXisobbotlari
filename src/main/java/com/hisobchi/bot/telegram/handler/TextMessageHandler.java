@@ -20,6 +20,7 @@ import com.hisobchi.bot.debt.service.DebtFlowService;
 import com.hisobchi.bot.debt.service.DebtService;
 import com.hisobchi.bot.notification.entity.NotificationSettings;
 import com.hisobchi.bot.notification.service.NotificationSettingsService;
+import com.hisobchi.bot.profit.entity.DailyProfit;
 import com.hisobchi.bot.profit.service.DailyProfitService;
 import com.hisobchi.bot.report.dto.ReportData;
 import com.hisobchi.bot.report.service.ReportService;
