@@ -86,4 +86,18 @@ class CategoryMatcherTest {
         TransactionType intent = matcher.detectIntent("benzinga 200 ming ketdi");
         assertEquals(TransactionType.EXPENSE, intent);
     }
+
+    @Test
+    @DisplayName("Intent: 'Foydadan 5 min xarajatga qo‘sh' -> EXPENSE")
+    void testIntentFoydadanXarajatExpense() {
+        TransactionType intent = matcher.detectIntent("Foydadan 5 min xarajatga qo‘sh");
+        assertEquals(TransactionType.EXPENSE, intent);
+    }
+
+    @Test
+    @DisplayName("Intent: 'foydadan 20 min' -> EXPENSE")
+    void testIntentFoydadanExpense() {
+        TransactionType intent = matcher.detectIntent("foydadan 20 min");
+        assertEquals(TransactionType.EXPENSE, intent);
+    }
 }

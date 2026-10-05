@@ -2,6 +2,7 @@ package com.hisobchi.bot.telegram.handler;
 
 import com.hisobchi.bot.ai.dto.ParsedDebt;
 import com.hisobchi.bot.ai.dto.ParsedTransaction;
+import com.hisobchi.bot.ai.service.CategoryMatcher;
 import com.hisobchi.bot.ai.service.DebtNlpService;
 import com.hisobchi.bot.ai.service.TransactionNlpService;
 import com.hisobchi.bot.ai.service.UzbekAmountParser;
@@ -82,6 +83,7 @@ public class TextMessageHandler {
     private final DebtNlpHandler debtNlpHandler;
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
     private final TransactionService transactionService;
+    private final CategoryMatcher categoryMatcher;
 
     // Temporary multi-step state storage per user
     private final ConcurrentHashMap<Long, BigDecimal> userCashProfits = new ConcurrentHashMap<>();
@@ -268,7 +270,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getCloseDayConfirmationKeyboard(), "HTML");
                 return;
             }
-            case "💵 Foydani kiritish", "Foydani kiritish" -> {
+            case "💵 Foydani kiritish", "Foydani kiritish", "foyda", "bugungi foyda", "kunlik foyda", "kunlik foydani kiritish" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 initiateProfitFlow(user, chatId, today);
                 return;
@@ -1330,6 +1332,13 @@ public class TextMessageHandler {
 
         if (!lowerText.contains("foyda")) {
             return false;
+        }
+
+        if (lowerText.equals("foyda") || lowerText.equals("bugungi foyda") || lowerText.equals("kunlik foyda")
+                || lowerText.equals("foydani kiritish") || lowerText.equals("kunlik foydani kiritish")) {
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            initiateProfitFlow(user, chatId, today);
+            return true;
         }
 
         // Case 1: Expense deducted from today's profit (e.g. "bugungi foydadan 10 min xarajatga qoshib qoy", "foydadan 20 ming xarajat")

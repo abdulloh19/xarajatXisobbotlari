@@ -141,6 +141,11 @@ public class CategoryMatcher {
             }
         }
 
+        // Check explicit expense words before income (e.g. "foydadan xarajat", "foydadan")
+        if (lower.contains("xarajat") || lower.contains("sarf") || lower.contains("ishlatdim") || lower.contains("foydadan")) {
+            return TransactionType.EXPENSE;
+        }
+
         // Check income words
         for (String word : INCOME_INTENT_WORDS) {
             if (lower.contains(word)) {
