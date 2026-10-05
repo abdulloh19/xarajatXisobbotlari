@@ -419,7 +419,7 @@ public class TextMessageHandler {
                 LocalDate prev = today.minusMonths(1);
                 LocalDate start = prev.withDayOfMonth(1);
                 LocalDate end = prev.with(TemporalAdjusters.lastDayOfMonth());
-                String title = prev.getMonth().name() + " " + prev.getYear() + " HISOBOTI";
+                String title = DateTimeUtils.formatUzbekMonthYear(prev) + " HISOBOTI";
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, end, title);
                 sendPeriodReport(chatId, data);
                 return;
@@ -430,7 +430,7 @@ public class TextMessageHandler {
                 if ("HISTORY".equals(userActiveMenu.get(user.getId()))) {
                     sendPeriodHistory(chatId, user, start, today, "Shu oylik");
                 } else {
-                    String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
+                    String title = DateTimeUtils.formatUzbekMonthYear(today) + " HISOBOTI";
                     ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
                     sendPeriodReport(chatId, data);
                 }
@@ -459,16 +459,40 @@ public class TextMessageHandler {
                         replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
-            case "🔄 Bugundan boshlash (tozalash)", "/reset", "/tozalash", "tozalash" -> {
+            case "🔄 Ma'lumotlarni tozalash", "🔄 Bugundan boshlash (tozalash)", "/reset", "/tozalash", "tozalash" -> {
                 apiClient.sendMessage(chatId,
                         """
-                        ⚠️ <b>Haqiqiy ish rejimiga o‘tish va tozalash:</b>
+                        ⚙️ <b>Ma'lumotlarni tozalash bo‘limi:</b>
 
-                        Barcha oldingi sinov xarajatlari, daromadlar, kunlik hisobotlar va qarzlar to‘liq tozalanadi hamda barcha hisob-kitoblar <b>bugungi kundan noldan</b> boshlanadi!
-
-                        Buni tasdiqlaysizmi?
+                        Qaysi ma'lumotlarni o‘chirmoqchisiz? Quyidagilardan birini tanlang:
                         """,
-                        inlineKeyboardFactory.getResetConfirmationKeyboard(), "HTML");
+                        inlineKeyboardFactory.getDataResetMenuKeyboard(), "HTML");
+                return;
+            }
+            case "foydalarni ochirish", "foydani ochirish", "foydani butkul ochirish" -> {
+                apiClient.sendMessage(chatId,
+                        """
+                        ⚠️ <b>Foyda va daromadlarni tozalash:</b>
+
+                        Shu paytgacha kiritilgan <b>barcha kunlik foydalar va daromadlar</b> butkul o‘chiriladi va nollashtiriladi.
+                        <i>Xarajatlaringiz va qarzlaringiz o‘chirilmaydi.</i>
+
+                        Rostdan ham barcha foyda va daromadlarni o‘chirmoqchimisiz?
+                        """,
+                        inlineKeyboardFactory.getResetProfitConfirmKeyboard(), "HTML");
+                return;
+            }
+            case "xarajatlarni ochirish", "xarajatni ochirish", "xarajatni butkul ochirish" -> {
+                apiClient.sendMessage(chatId,
+                        """
+                        ⚠️ <b>Xarajatlarni tozalash:</b>
+
+                        Shu paytgacha kiritilgan <b>barcha xarajat operatsiyalari</b> butkul o‘chiriladi.
+                        <i>Foyda va daromadlaringiz o‘chirilmaydi.</i>
+
+                        Rostdan ham barcha xarajatlarni o‘chirmoqchimisiz?
+                        """,
+                        inlineKeyboardFactory.getResetExpenseConfirmKeyboard(), "HTML");
                 return;
             }
         }
@@ -1193,7 +1217,7 @@ public class TextMessageHandler {
             } else if (lowerText.contains("shu oy")) {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 LocalDate start = today.withDayOfMonth(1);
-                String title = today.getMonth().name() + " " + today.getYear() + " HISOBOTI";
+                String title = DateTimeUtils.formatUzbekMonthYear(today) + " HISOBOTI";
                 ReportData data = reportService.getPeriodReportData(user.getId(), start, today, title);
                 sendPeriodReport(chatId, data);
                 return;

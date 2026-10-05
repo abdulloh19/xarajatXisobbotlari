@@ -112,18 +112,87 @@ public class CallbackQueryHandler {
 
     private void handleDataCallback(User user, Long chatId, Integer messageId, String[] parts) {
         if (parts.length > 2 && "reset".equals(parts[1])) {
-            String sub = parts[2];
-            if ("confirm".equals(sub)) {
-                dataResetService.resetAllUserData(user.getId());
+            String target = parts[2];
+            String op = parts.length > 3 ? parts[3] : target;
+
+            if ("menu".equals(target)) {
                 apiClient.editMessageText(chatId, messageId,
-                        "✅ <b>Barcha ma'lumotlar tozalandi!</b>\n\n" +
-                        "📅 Hisob-kitobingiz <b>bugundan</b> boshlab toza holatda boshlandi.\n\n" +
-                        "Endi haqiqiy daromad va xarajatlaringizni bemalol yozib borishingiz mumkin:\n" +
-                        "💰 <b>Foydani kiritish</b> — bugungi foydangizni kiriting\n" +
-                        "💸 <b>Xarajat qo‘shish</b> — xarajatlaringizni yozib boring",
-                        null, "HTML");
-                apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
-            } else {
+                        "⚙️ <b>Ma'lumotlarni tozalash bo‘limi:</b>\n\n" +
+                        "Qaysi ma'lumotlarni o‘chirmoqchisiz? Quyidagilardan birini tanlang:",
+                        inlineKeyboardFactory.getDataResetMenuKeyboard(), "HTML");
+                return;
+            }
+
+            if ("profit".equals(target)) {
+                if ("ask".equals(op)) {
+                    apiClient.editMessageText(chatId, messageId,
+                            """
+                            ⚠️ <b>Foyda va daromadlarni tozalash:</b>
+
+                            Shu paytgacha kiritilgan <b>barcha kunlik foydalar va daromadlar</b> butkul o‘chiriladi va nollashtiriladi.
+                            <i>Xarajatlaringiz va qarzlaringiz o‘chirilmaydi.</i>
+
+                            Rostdan ham barcha foyda va daromadlarni o‘chirmoqchimisiz?
+                            """,
+                            inlineKeyboardFactory.getResetProfitConfirmKeyboard(), "HTML");
+                } else if ("confirm".equals(op)) {
+                    dataResetService.deleteAllProfitsAndIncomes(user.getId());
+                    apiClient.editMessageText(chatId, messageId,
+                            "✅ <b>Barcha kunlik foyda va daromadlar muvaffaqiyatli tozalandi!</b>\n\n" +
+                            "Oldingi foydalar nollashtirildi. Xarajatlaringiz o‘zgarishsiz saqlandi.",
+                            null, "HTML");
+                }
+                return;
+            }
+
+            if ("expense".equals(target)) {
+                if ("ask".equals(op)) {
+                    apiClient.editMessageText(chatId, messageId,
+                            """
+                            ⚠️ <b>Xarajatlarni tozalash:</b>
+
+                            Shu paytgacha kiritilgan <b>barcha xarajat operatsiyalari</b> butkul o‘chiriladi.
+                            <i>Foyda va daromadlaringiz o‘chirilmaydi.</i>
+
+                            Rostdan ham barcha xarajatlarni o‘chirmoqchimisiz?
+                            """,
+                            inlineKeyboardFactory.getResetExpenseConfirmKeyboard(), "HTML");
+                } else if ("confirm".equals(op)) {
+                    dataResetService.deleteAllExpenses(user.getId());
+                    apiClient.editMessageText(chatId, messageId,
+                            "✅ <b>Barcha xarajat operatsiyalari muvaffaqiyatli tozalandi!</b>\n\n" +
+                            "Oldingi xarajatlar o‘chirildi. Foyda va daromadlaringiz o‘zgarishsiz saqlandi.",
+                            null, "HTML");
+                }
+                return;
+            }
+
+            if ("all".equals(target) || "confirm".equals(target)) {
+                if ("ask".equals(op)) {
+                    apiClient.editMessageText(chatId, messageId,
+                            """
+                            ⚠️ <b>Barchasini tozalash (Bugundan noldan boshlash):</b>
+
+                            Barcha oldingi xarajatlar, daromadlar, kunlik foydalar va qarzlar to‘liq tozalanadi hamda barcha hisob-kitoblar <b>bugungi kundan noldan</b> boshlanadi!
+
+                            Buni tasdiqlaysizmi?
+                            """,
+                            inlineKeyboardFactory.getResetAllConfirmKeyboard(), "HTML");
+                } else if ("confirm".equals(op) || "confirm".equals(target)) {
+                    dataResetService.resetAllUserData(user.getId());
+                    apiClient.editMessageText(chatId, messageId,
+                            "✅ <b>Barcha ma'lumotlar tozalandi!</b>\n\n" +
+                            "📅 Hisob-kitobingiz <b>bugundan</b> boshlab toza holatda boshlandi.\n\n" +
+                            "Endi haqiqiy daromad va xarajatlaringizni bemalol yozib borishingiz mumkin:\n" +
+                            "💰 <b>Foydani kiritish</b> — bugungi foydangizni kiriting\n" +
+                            "💸 <b>Xarajat qo‘shish</b> — xarajatlaringizni yozib boring",
+                            null, "HTML");
+                    apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                }
+                return;
+            }
+
+            if ("cancel".equals(target) || "cancel".equals(op)) {
                 apiClient.editMessageText(chatId, messageId, "❌ Tozalash bekor qilindi.", null, null);
             }
         }

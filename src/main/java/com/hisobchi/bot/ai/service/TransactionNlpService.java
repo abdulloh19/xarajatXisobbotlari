@@ -26,11 +26,12 @@ public class TransactionNlpService {
         String cleaned = text.trim();
         log.debug("Parsing message text: '{}'", cleaned);
 
-        // Guard against period/menu navigation strings like "Oxirgi 7 kun", "7 kun", "Hisobotlar", etc.
+        // Guard against period/menu navigation strings like "Oxirgi 7 kun", "7 kun", "Hisobotlar", "tozalash", etc.
         String lower = cleaned.toLowerCase();
-        if (lower.contains("oxirgi") || lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil)\\b.*") || lower.contains("hisobot")) {
+        if (lower.contains("oxirgi") || lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil)\\b.*") || lower.contains("hisobot")
+                || lower.contains("tozalash") || lower.contains("ochirish") || lower.contains("o‘chirish") || lower.contains("o'chirish")) {
             if (!lower.contains("so'm") && !lower.contains("som") && !lower.contains("ming") && !lower.contains("mln")
-                    && !lower.contains("xarajat") && !lower.contains("daromad") && !lower.contains("berdim") && !lower.contains("oldim")) {
+                    && !lower.contains("berdim") && !lower.contains("oldim")) {
                 log.debug("Ignoring non-financial navigation/period text: '{}'", cleaned);
                 return Optional.empty();
             }

@@ -649,17 +649,66 @@ public class InlineKeyboardFactory {
                 .build();
     }
 
-    public InlineKeyboardMarkup getResetConfirmationKeyboard() {
+    public InlineKeyboardMarkup getDataResetMenuKeyboard() {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("🗑 Ha, tozalab bugundan boshlash", "data:reset:confirm")
+                                new InlineKeyboardButton("💵 Foyda va daromadlarni o‘chirish", "data:reset:profit:ask")
                         ),
                         List.of(
-                                new InlineKeyboardButton("❌ Yo‘q, bekor qilish", "data:reset:cancel")
+                                new InlineKeyboardButton("💸 Xarajatlarni o‘chirish", "data:reset:expense:ask")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("🔄 Barchasini tozalash (Hammasi noldan)", "data:reset:all:ask")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")
                         )
                 ))
                 .build();
+    }
+
+    public InlineKeyboardMarkup getResetProfitConfirmKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🗑 Ha, barcha foydalarni o‘chirish", "data:reset:profit:confirm")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getResetExpenseConfirmKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🗑 Ha, barcha xarajatlarni o‘chirish", "data:reset:expense:confirm")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getResetAllConfirmKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🗑 Ha, barchasini tozalash", "data:reset:all:confirm")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getResetConfirmationKeyboard() {
+        return getResetAllConfirmKeyboard();
     }
 
     public InlineKeyboardMarkup getProfitEditOptionsKeyboard(LocalDate date) {

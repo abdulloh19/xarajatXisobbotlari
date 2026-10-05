@@ -111,17 +111,17 @@ public class ReportService {
                 continue;
             }
 
-            if (p != null && p.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+            if (p != null && p.isWorkDay()) {
                 completedDays++;
-                cashSum = cashSum.add(p.getCashAmount());
-                cardSum = cardSum.add(p.getCardAmount());
-                profitSum = profitSum.add(p.getTotalProfit());
+                if (p.getCashAmount() != null) cashSum = cashSum.add(p.getCashAmount());
+                if (p.getCardAmount() != null) cardSum = cardSum.add(p.getCardAmount());
+                if (p.getTotalProfit() != null) profitSum = profitSum.add(p.getTotalProfit());
             } else {
                 BigDecimal dayInc = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.INCOME, d);
                 if (dayInc != null && dayInc.compareTo(BigDecimal.ZERO) > 0) {
                     completedDays++;
                     profitSum = profitSum.add(dayInc);
-                } else if (hasExp) {
+                } else if (hasExp && p == null) {
                     incompleteDays++;
                     incompleteDates.add(d);
                 }
@@ -131,9 +131,10 @@ public class ReportService {
         // Section 64: totalEarned = SUM(each day's expense + each day's profit)
         BigDecimal totalEarned = expense.add(profitSum);
 
-        long activeDays = transactionRepository.countActiveDaysBetween(userId, start, end);
-        if (activeDays == 0 && completedDays > 0) {
-            activeDays = completedDays;
+        long txActiveDays = transactionRepository.countActiveDaysBetween(userId, start, end);
+        long activeDays = Math.max(txActiveDays, completedDays);
+        if (activeDays == 0) {
+            activeDays = 1;
         }
 
         List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesBetween(
@@ -148,7 +149,7 @@ public class ReportService {
                 .totalProfit(profitSum)
                 .cashProfit(cashSum)
                 .cardProfit(cardSum)
-                .activeDays(Math.max(activeDays, 1))
+                .activeDays(activeDays)
                 .completedDays(completedDays)
                 .incompleteDays(incompleteDays)
                 .incompleteDates(incompleteDates)
@@ -305,9 +306,11 @@ public class ReportService {
 
         long daysDiv = Math.max(data.activeDays(), 1);
         BigDecimal avgEarned = data.totalEarned().divide(BigDecimal.valueOf(daysDiv), 0, RoundingMode.HALF_UP);
+        BigDecimal avgExpense = data.totalExpense().divide(BigDecimal.valueOf(daysDiv), 0, RoundingMode.HALF_UP);
         BigDecimal avgProfit = data.totalProfit().divide(BigDecimal.valueOf(daysDiv), 0, RoundingMode.HALF_UP);
 
         sb.append("💰 <b>O‘rtacha kunlik ishlab topilgan:</b> ").append(MoneyFormatter.format(avgEarned)).append("\n");
+        sb.append("💸 <b>O‘rtacha kunlik xarajat:</b> ").append(MoneyFormatter.format(avgExpense)).append("\n");
         sb.append("✅ <b>O‘rtacha kunlik foyda:</b> ").append(MoneyFormatter.format(avgProfit)).append("\n");
 
         if (data.incompleteDays() > 0) {

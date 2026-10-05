@@ -6,6 +6,7 @@ import com.hisobchi.bot.transaction.entity.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -97,6 +98,17 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             Long userId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     Page<Transaction> findByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId, Pageable pageable);
+
+    @Query("SELECT DISTINCT t.transactionDate FROM Transaction t " +
+           "WHERE t.user.id = :userId AND t.transactionDate BETWEEN :startDate AND :endDate")
+    List<LocalDate> findDistinctTransactionDatesBetween(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    @Modifying
+    @Query("DELETE FROM Transaction t WHERE t.user.id = :userId AND t.type = :type")
+    void deleteByUserIdAndType(@Param("userId") Long userId, @Param("type") TransactionType type);
 
     void deleteByUserId(Long userId);
 }

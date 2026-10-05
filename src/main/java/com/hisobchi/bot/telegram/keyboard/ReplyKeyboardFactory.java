@@ -156,7 +156,7 @@ public class ReplyKeyboardFactory {
                                 new KeyboardButton("🔔 Eslatmalar")
                         ),
                         List.of(
-                                new KeyboardButton("🔄 Bugundan boshlash (tozalash)")
+                                new KeyboardButton("🔄 Ma'lumotlarni tozalash")
                         ),
                         List.of(new KeyboardButton("⬅️ Asosiy menyu"))
                 ))

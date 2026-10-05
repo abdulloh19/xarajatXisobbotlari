@@ -201,6 +201,13 @@ public final class BotMessageBuilder {
         sb.append("✅ <b>OYLIK FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
+        if (stats.cashProfit() != null && stats.cardProfit() != null
+                && (stats.cashProfit().compareTo(BigDecimal.ZERO) > 0 || stats.cardProfit().compareTo(BigDecimal.ZERO) > 0)) {
+            sb.append("💵 <b>Naqd:</b> ").append(MoneyFormatter.format(stats.cashProfit())).append("\n");
+            sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(stats.cardProfit())).append("\n\n");
+            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        }
+
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
             sb.append("📂 <b>Xarajatlar:</b>\n\n");
             for (CategoryExpenseDto cat : stats.expenseCategories()) {

@@ -44,4 +44,29 @@ public class DataResetService {
         });
         log.info("User id {} data reset successfully.", userId);
     }
+
+    @Transactional
+    public void deleteAllProfitsAndIncomes(Long userId) {
+        log.info("Deleting all daily profits and incomes for user id: {}", userId);
+        dailyProfitRepository.deleteByUserId(userId);
+        transactionRepository.deleteByUserIdAndType(userId, com.hisobchi.bot.transaction.entity.TransactionType.INCOME);
+        draftRepository.deleteByUserIdAndType(userId, com.hisobchi.bot.transaction.entity.TransactionType.INCOME);
+        dailySummaryRepository.deleteByUserId(userId);
+
+        userBalanceRepository.findByUserId(userId).ifPresent(ub -> {
+            ub.setCashBalance(BigDecimal.ZERO);
+            ub.setCardBalance(BigDecimal.ZERO);
+            userBalanceRepository.save(ub);
+        });
+        log.info("All profits and incomes deleted for user id: {}", userId);
+    }
+
+    @Transactional
+    public void deleteAllExpenses(Long userId) {
+        log.info("Deleting all expenses for user id: {}", userId);
+        transactionRepository.deleteByUserIdAndType(userId, com.hisobchi.bot.transaction.entity.TransactionType.EXPENSE);
+        draftRepository.deleteByUserIdAndType(userId, com.hisobchi.bot.transaction.entity.TransactionType.EXPENSE);
+        dailySummaryRepository.deleteByUserId(userId);
+        log.info("All expenses deleted for user id: {}", userId);
+    }
 }
