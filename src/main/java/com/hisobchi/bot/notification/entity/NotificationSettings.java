@@ -27,7 +27,7 @@ public class NotificationSettings {
 
     @Column(name = "profit_reminder_18_enabled", nullable = false)
     @Builder.Default
-    private Boolean profitReminder18Enabled = true;
+    private Boolean profitReminder18Enabled = false;
 
     @Column(name = "profit_reminder_21_enabled", nullable = false)
     @Builder.Default

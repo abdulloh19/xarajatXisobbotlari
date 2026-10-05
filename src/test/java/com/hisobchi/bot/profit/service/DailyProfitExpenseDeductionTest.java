@@ -327,9 +327,9 @@ class DailyProfitExpenseDeductionTest {
         var firstRow = keyboard.getInlineKeyboard().get(0);
         assertEquals(2, firstRow.size());
         assertEquals("draft:save_today_deduct:101", firstRow.get(0).getCallbackData());
-        assertTrue(firstRow.get(0).getText().contains("Kunlik foydadan"));
+        assertTrue(firstRow.get(0).getText().contains("Ha"));
         assertEquals("draft:save_today_separate:101", firstRow.get(1).getCallbackData());
-        assertTrue(firstRow.get(1).getText().contains("Alohida"));
+        assertTrue(firstRow.get(1).getText().contains("Yo‘q") || firstRow.get(1).getText().contains("Alohida"));
 
         // Second row: oldingi kundan
         var secondRow = keyboard.getInlineKeyboard().get(1);

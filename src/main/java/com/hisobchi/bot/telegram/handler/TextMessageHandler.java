@@ -1388,19 +1388,19 @@ public class TextMessageHandler {
                         💸 <b>Xarajat:</b> <b>%s</b>
                         📂 <b>Kategoriya:</b> %s
                         ━━━━━━━━━━━━━━━━━━
+                        💰 <b>Umumiy kunlik topilgan pul (o‘zgarmadi):</b> <b>%s</b>
                         💰 <b>Bugungi yangi foyda:</b> <b>%s</b>
                         <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
 
                         💸 <b>Bugungi jami xarajat:</b> <b>%s</b>
-                        📈 <b>Bugungi sof foyda:</b> <b>%s</b>
                         """,
                         MoneyFormatter.format(saved.getAmount()),
                         catName,
+                        MoneyFormatter.format(stats.totalIncome()),
                         MoneyFormatter.format(updatedProfit != null ? updatedProfit.getTotalProfit() : BigDecimal.ZERO),
                         MoneyFormatter.format(updatedProfit != null ? updatedProfit.getCashAmount() : BigDecimal.ZERO),
                         MoneyFormatter.format(updatedProfit != null ? updatedProfit.getCardAmount() : BigDecimal.ZERO),
-                        MoneyFormatter.format(stats.totalExpense()),
-                        MoneyFormatter.format(stats.netProfit())
+                        MoneyFormatter.format(stats.totalExpense())
                 );
 
                 apiClient.sendMessage(chatId, msg,

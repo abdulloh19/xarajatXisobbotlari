@@ -73,8 +73,9 @@ public final class BotMessageBuilder {
         if (draft.type() == TransactionType.EXPENSE) {
             sb.append("━━━━━━━━━━━━━━━━━━\n");
             if (hasEnteredProfitToday) {
-                sb.append("🤔 <b>Bu xarajat qanday hisoblansin?</b>\n");
-                sb.append("<i>Kunlik foydadan ayirilsinmi yoki alohidami?</i>");
+                sb.append("🤔 <b>Bugungi foydadan minus qilinsinmi?</b>\n\n");
+                sb.append("✅ <b>Ha</b> — kiritilgan kunlik foydadan ayiriladi, umumiy topilgan pul o‘zgarmaydi.\n");
+                sb.append("❌ <b>Yo‘q</b> — alohida xarajat bo‘ladi, umumiy topilgan pulga va xarajatga qo‘shiladi.");
             } else if (isOffDay) {
                 sb.append("🏖 <b>Bugun dam olish kuni.</b>\n");
                 String dayLabel = (lastWorkDayText != null && !lastWorkDayText.isBlank()) ? lastWorkDayText : "oldingi ishlagan kun";
@@ -107,10 +108,11 @@ public final class BotMessageBuilder {
             sb.append("💸 ").append(label).append(" umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
             sb.append("✅ ").append(label).append(" yakuniy sof foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
         } else {
-            sb.append("💸 ").append(MoneyFormatter.format(tx.amount())).append(" (Bugungi foydadan ayirildi)\n");
+            sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Bugungi foydadan minus qilindi)\n");
             sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
-            sb.append("💸 Bugungi xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
-            sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
+            sb.append("💰 Bugungi umumiy topilgan pul (o‘zgarmadi):\n<b>").append(MoneyFormatter.format(totalIncome)).append("</b>\n\n");
+            sb.append("💸 Bugungi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
+            sb.append("✅ Bugungi qolgan foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
         }
         return sb.toString();
     }

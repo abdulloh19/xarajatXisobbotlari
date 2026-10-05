@@ -1176,20 +1176,21 @@ public class CallbackQueryHandler {
                     : "0 so‘m";
 
             String successMsg = String.format("""
-                    ✅ <b>Alohida xarajat saqlandi (kunlik foydaga tegilmadi)!</b>
+                    ✅ <b>Alohida xarajat saqlandi!</b>
 
                     💸 <b>%s</b>
                     📌 %s
-
-                    💰 Kunlik foyda o‘zgarishsiz: <b>%s</b>
-                    💸 Bugungi umumiy xarajatlar: <b>%s</b>
-                    📈 Bugungi sof foyda: <b>%s</b>
+                    ━━━━━━━━━━━━━━━━━━
+                    💰 <b>Bugungi umumiy topilgan pul:</b> <b>%s</b> (+%s qo‘shildi)
+                    💸 <b>Bugungi umumiy xarajatlar:</b> <b>%s</b>
+                    ✅ <b>Bugungi foyda (o‘zgarishsiz):</b> <b>%s</b>
                     """,
                     MoneyFormatter.format(saved.amount()),
                     saved.getCategoryDisplayName(),
-                    profitText,
+                    MoneyFormatter.format(targetStats.totalIncome()),
+                    MoneyFormatter.format(saved.amount()),
                     MoneyFormatter.format(targetStats.totalExpense()),
-                    MoneyFormatter.format(targetStats.netProfit())
+                    profitText
             );
 
             apiClient.editMessageText(chatId, messageId, successMsg,

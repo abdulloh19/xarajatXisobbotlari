@@ -114,13 +114,31 @@ public class ReminderService {
             return;
         }
 
-        String text = "🌙 <b>Bugungi foydangizni kiritishni unutmang.</b>\n\n" +
-                      "Bugungi xarajatlaringiz saqlangan.\n\n" +
-                      "Endi qo‘lingizda qolgan pulni kiriting, shunda bugungi to‘liq hisob tayyor bo‘ladi.";
+        Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), today);
+        String text;
+
+        if (profitOpt.isPresent() && profitOpt.get().getTotalProfit() != null && profitOpt.get().getTotalProfit().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            text = String.format("""
+                    🌙 <b>Kechki hisob-kitob:</b>
+
+                    Bugungi kiritilgan daromadingiz (foydangiz): <b>%s</b>
+
+                    Bugun yana qo‘shimcha daromad bo‘ldimi yoki yakuniy foydani kiritmoqchimisiz?
+                    """,
+                    MoneyFormatter.format(profitOpt.get().getTotalProfit())
+            );
+        } else {
+            text = """
+                    🌙 <b>Kechki hisob-kitob:</b>
+
+                    Bugungi daromadingizni (foydangizni) kiriting!
+                    Kunlik to‘liq hisobingiz chiqishi uchun daromad va qo‘lingizdagi foydani kiritishni unutmang.
+                    """;
+        }
 
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
-                        List.of(InlineKeyboardButton.builder().text("✅ Bugungi foydani kiritish").callbackData("profit:enter").build()),
+                        List.of(InlineKeyboardButton.builder().text("💵 Daromadni / Foydani kiritish").callbackData("profit:enter").build()),
                         List.of(InlineKeyboardButton.builder().text("📊 Bugungi hisob").callbackData("report:daily").build())
                 ))
                 .build();

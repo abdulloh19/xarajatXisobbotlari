@@ -66,8 +66,8 @@ public class InlineKeyboardFactory {
             return InlineKeyboardMarkup.builder()
                     .inlineKeyboard(List.of(
                             List.of(
-                                    new InlineKeyboardButton("💵 Kunlik foydadan", "draft:save_today_deduct:" + draftId),
-                                    new InlineKeyboardButton("💳 Alohida", "draft:save_today_separate:" + draftId)
+                                    new InlineKeyboardButton("✅ Ha (Foydadan minus)", "draft:save_today_deduct:" + draftId),
+                                    new InlineKeyboardButton("❌ Yo‘q (Alohida)", "draft:save_today_separate:" + draftId)
                             ),
                             List.of(
                                     new InlineKeyboardButton("📅 Oldingi kundan", "draft:save_yesterday:" + draftId)
