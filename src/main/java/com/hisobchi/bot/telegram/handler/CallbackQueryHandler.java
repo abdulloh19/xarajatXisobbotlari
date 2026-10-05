@@ -100,6 +100,12 @@ public class CallbackQueryHandler {
             case "reminder" -> handleReminderCallback(user, chatId, messageId, parts);
             case "report" -> handleReportCallback(user, chatId, messageId, parts);
             case "data" -> handleDataCallback(user, chatId, messageId, parts);
+            case "menu" -> {
+                if (parts.length > 1 && "main".equals(parts[1])) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "🏠 <b>Asosiy menyu:</b>", replyKeyboardFactory.getMainMenu(), "HTML");
+                }
+            }
             case "history" -> {
                 if ("back".equals(parts[1])) {
                     textMessageHandler.setUserActiveMenu(user.getId(), "HISTORY");
@@ -1002,10 +1008,12 @@ public class CallbackQueryHandler {
                 }
             }
             case "save_yesterday" -> handleSaveExpense(user, chatId, messageId, draftId, true);
-            case "save_today" -> handleSaveExpense(user, chatId, messageId, draftId, false);
+            case "save_today", "save_today_deduct" -> handleSaveExpense(user, chatId, messageId, draftId, false);
+            case "save_today_separate" -> handleSaveExpenseSeparate(user, chatId, messageId, draftId);
             case "cancel" -> {
                 draftService.cancelDraft(draftId, user.getId());
-                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.",
+                        inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
             }
             case "edit" -> {
@@ -1045,9 +1053,15 @@ public class CallbackQueryHandler {
                             .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                             .orElse("oldingi ishlagan kun");
                 }
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
+                Optional<DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
+                boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
+                        && todayProfitOpt.get().isWorkDay()
+                        && todayProfitOpt.get().getTotalProfit() != null
+                        && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+
+                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText, hasEnteredProfitToday), "HTML");
             }
             case "back" -> {
                 TransactionDraft d = draftService.getDraft(draftId, user.getId());
@@ -1060,9 +1074,15 @@ public class CallbackQueryHandler {
                             .map(p -> DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                             .orElse("oldingi ishlagan kun");
                 }
-                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
+                Optional<DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
+                boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
+                        && todayProfitOpt.get().isWorkDay()
+                        && todayProfitOpt.get().getTotalProfit() != null
+                        && todayProfitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+
+                String msg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText), "HTML");
+                        inlineKeyboardFactory.getDraftConfirmationKeyboard(draftId, dto.type(), isOffDay, lastWorkText, hasEnteredProfitToday), "HTML");
             }
             case "intent" -> {
                 String intentType = parts[3];
@@ -1131,6 +1151,55 @@ public class CallbackQueryHandler {
             apiClient.sendMessage(chatId, "⚠️ " + e.getMessage(), replyKeyboardFactory.getMainMenu(), null);
         } catch (Exception e) {
             log.error("Failed to save expense draft {} with isYesterday={}: {}", draftId, isYesterday, e.getMessage(), e);
+            apiClient.sendMessage(chatId, "⚠️ Xatolik yuz berdi. Qaytadan urinib ko‘ring.",
+                    replyKeyboardFactory.getMainMenu(), null);
+        }
+    }
+
+    private void handleSaveExpenseSeparate(User user, Long chatId, Integer messageId, Long draftId) {
+        String actionKey = "save_draft_" + draftId;
+        if (!idempotencyService.tryAcquireAction(actionKey)) {
+            log.warn("Duplicate save ignored for draft {}", draftId);
+            return;
+        }
+
+        try {
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), today);
+
+            // Alohida xarajat: Kunlik foydadan ayirilmaydi (foydaga tegilmaydi).
+            DailyProfit existingProfit = dailyProfitService.getProfit(user.getId(), today).orElse(null);
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
+
+            String profitText = (existingProfit != null && existingProfit.getTotalProfit() != null)
+                    ? MoneyFormatter.format(existingProfit.getTotalProfit())
+                    : "0 so‘m";
+
+            String successMsg = String.format("""
+                    ✅ <b>Alohida xarajat saqlandi (kunlik foydaga tegilmadi)!</b>
+
+                    💸 <b>%s</b>
+                    📌 %s
+
+                    💰 Kunlik foyda o‘zgarishsiz: <b>%s</b>
+                    💸 Bugungi umumiy xarajatlar: <b>%s</b>
+                    📈 Bugungi sof foyda: <b>%s</b>
+                    """,
+                    MoneyFormatter.format(saved.amount()),
+                    saved.getCategoryDisplayName(),
+                    profitText,
+                    MoneyFormatter.format(targetStats.totalExpense()),
+                    MoneyFormatter.format(targetStats.netProfit())
+            );
+
+            apiClient.editMessageText(chatId, messageId, successMsg,
+                    inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+            userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+        } catch (ValidationException e) {
+            apiClient.sendMessage(chatId, "⚠️ " + e.getMessage(), replyKeyboardFactory.getMainMenu(), null);
+        } catch (Exception e) {
+            log.error("Failed to save separate expense draft {}: {}", draftId, e.getMessage(), e);
             apiClient.sendMessage(chatId, "⚠️ Xatolik yuz berdi. Qaytadan urinib ko‘ring.",
                     replyKeyboardFactory.getMainMenu(), null);
         }

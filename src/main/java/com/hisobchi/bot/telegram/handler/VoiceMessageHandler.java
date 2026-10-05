@@ -38,6 +38,8 @@ public class VoiceMessageHandler {
 
     private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
     private final com.hisobchi.bot.telegram.handler.DebtNlpHandler debtNlpHandler;
+    @org.springframework.context.annotation.Lazy
+    private final TextMessageHandler textMessageHandler;
 
     public void handle(User user, Message message) {
         Long chatId = message.getChat().getId();
@@ -78,6 +80,11 @@ public class VoiceMessageHandler {
                     "🤝 <b>Qarz ma'lumoti</b> deb tushundim, lekin to‘liq aniqlab bo‘lmadi.\n\n" +
                     "Iltimos, summani va kimdan/kimga ekanligini aniqroq ayting (masalan: <i>\"25 ming magazindan qarz\"</i> yoki <i>\"50 ming Aliga qarz berdim\"</i>):",
                     replyKeyboardFactory.getDebtsMenu(), "HTML");
+            return;
+        }
+
+        // Quick natural command for profit adjustments or profit expenses via voice
+        if (textMessageHandler.handleQuickProfitCommand(user, chatId, transcribedText)) {
             return;
         }
 
@@ -122,9 +129,15 @@ public class VoiceMessageHandler {
                         .map(p -> com.hisobchi.bot.common.util.DateTimeUtils.formatUzbekDate(p.getProfitDate()))
                         .orElse("oldingi ishlagan kun");
             }
-            String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText);
+            java.util.Optional<com.hisobchi.bot.profit.entity.DailyProfit> todayProfitOpt = dailyProfitService.getProfit(user.getId(), today);
+            boolean hasEnteredProfitToday = todayProfitOpt.isPresent()
+                    && todayProfitOpt.get().isWorkDay()
+                    && todayProfitOpt.get().getTotalProfit() != null
+                    && todayProfitOpt.get().getTotalProfit().compareTo(java.math.BigDecimal.ZERO) > 0;
+
+            String confirmMsg = BotMessageBuilder.buildDraftConfirmationMessage(dto, user.getTimezone(), isOffDay, lastWorkText, hasEnteredProfitToday);
             apiClient.sendMessage(chatId, confirmMsg,
-                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText), "HTML");
+                    inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText, hasEnteredProfitToday), "HTML");
             return;
         }
 

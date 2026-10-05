@@ -128,14 +128,16 @@ class TransactionCategoryEditTest {
     }
 
     @Test
-    @DisplayName("Operatsiyani saqlagandan so‘ng kategoriya o‘zgartirish tugmasi mavjud bo‘ladi")
+    @DisplayName("Operatsiyani saqlagandan so‘ng kategoriya o‘zgartirish va asosiy menyu tugmasi mavjud bo‘ladi")
     void testSavedTransactionKeyboard() {
         InlineKeyboardFactory factory = new InlineKeyboardFactory();
         InlineKeyboardMarkup markup = factory.getSavedTransactionKeyboard(100L);
 
         assertNotNull(markup);
-        assertEquals(1, markup.getInlineKeyboard().size());
+        assertEquals(2, markup.getInlineKeyboard().size());
         assertEquals("tx:edit_field:100:cat", markup.getInlineKeyboard().get(0).get(0).getCallbackData());
         assertEquals("📂 Kategoriyani o‘zgartirish", markup.getInlineKeyboard().get(0).get(0).getText());
+        assertEquals("menu:main", markup.getInlineKeyboard().get(1).get(0).getCallbackData());
+        assertEquals("🏠 Asosiy menyuga qaytish", markup.getInlineKeyboard().get(1).get(0).getText());
     }
 }

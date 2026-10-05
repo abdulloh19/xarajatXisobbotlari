@@ -43,7 +43,7 @@ public final class BotMessageBuilder {
                 """;
     }
 
-    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone, boolean isOffDay, String lastWorkDayText) {
+    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone, boolean isOffDay, String lastWorkDayText, boolean hasEnteredProfitToday) {
         StringBuilder sb = new StringBuilder();
 
         if (draft.source() == TransactionSource.VOICE) {
@@ -72,7 +72,10 @@ public final class BotMessageBuilder {
         sb.append("📅 Sana:\n").append(DateTimeUtils.formatDateTime(draft.createdAt(), timezone)).append("\n\n");
         if (draft.type() == TransactionType.EXPENSE) {
             sb.append("━━━━━━━━━━━━━━━━━━\n");
-            if (isOffDay) {
+            if (hasEnteredProfitToday) {
+                sb.append("🤔 <b>Bu xarajat qanday hisoblansin?</b>\n");
+                sb.append("<i>Kunlik foydadan ayirilsinmi yoki alohidami?</i>");
+            } else if (isOffDay) {
                 sb.append("🏖 <b>Bugun dam olish kuni.</b>\n");
                 String dayLabel = (lastWorkDayText != null && !lastWorkDayText.isBlank()) ? lastWorkDayText : "oldingi ishlagan kun";
                 sb.append("<i>Bu xarajat ").append(dayLabel).append(" foydasidan ayiriladi:</i>");
@@ -86,8 +89,12 @@ public final class BotMessageBuilder {
         return sb.toString();
     }
 
+    public static String buildDraftConfirmationMessage(DraftDto draft, String timezone, boolean isOffDay, String lastWorkDayText) {
+        return buildDraftConfirmationMessage(draft, timezone, isOffDay, lastWorkDayText, false);
+    }
+
     public static String buildDraftConfirmationMessage(DraftDto draft, String timezone) {
-        return buildDraftConfirmationMessage(draft, timezone, false, null);
+        return buildDraftConfirmationMessage(draft, timezone, false, null, false);
     }
 
     public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, String profitSourceLabel, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {

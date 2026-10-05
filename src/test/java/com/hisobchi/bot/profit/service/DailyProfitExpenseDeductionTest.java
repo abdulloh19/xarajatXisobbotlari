@@ -313,4 +313,37 @@ class DailyProfitExpenseDeductionTest {
         assertEquals(new BigDecimal("600000"), updated.getTotalProfit());
         verify(balanceService).updateDailyProfitDelta(eq(testUser), eq(new BigDecimal("100000")), eq(BigDecimal.ZERO));
     }
+
+    @Test
+    @DisplayName("Expense confirmation keyboard when profit is entered offers deduct and separate buttons")
+    void testExpenseConfirmationKeyboardWhenProfitEnteredToday() {
+        InlineKeyboardMarkup keyboard = inlineKeyboardFactory.getDraftConfirmationKeyboard(101L, TransactionType.EXPENSE, false, null, true);
+
+        assertNotNull(keyboard);
+        assertNotNull(keyboard.getInlineKeyboard());
+        assertEquals(3, keyboard.getInlineKeyboard().size());
+
+        // First row: deduct from today's profit OR separate expense
+        var firstRow = keyboard.getInlineKeyboard().get(0);
+        assertEquals(2, firstRow.size());
+        assertEquals("draft:save_today_deduct:101", firstRow.get(0).getCallbackData());
+        assertTrue(firstRow.get(0).getText().contains("Kunlik foydadan"));
+        assertEquals("draft:save_today_separate:101", firstRow.get(1).getCallbackData());
+        assertTrue(firstRow.get(1).getText().contains("Alohida"));
+
+        // Second row: oldingi kundan
+        var secondRow = keyboard.getInlineKeyboard().get(1);
+        assertEquals(1, secondRow.size());
+        assertEquals("draft:save_yesterday:101", secondRow.get(0).getCallbackData());
+    }
+
+    @Test
+    @DisplayName("Main menu return keyboard contains menu:main callback")
+    void testMainMenuReturnKeyboard() {
+        InlineKeyboardMarkup keyboard = inlineKeyboardFactory.getMainMenuReturnKeyboard();
+        assertNotNull(keyboard);
+        assertEquals(1, keyboard.getInlineKeyboard().size());
+        assertEquals("menu:main", keyboard.getInlineKeyboard().get(0).get(0).getCallbackData());
+        assertTrue(keyboard.getInlineKeyboard().get(0).get(0).getText().contains("Asosiy menyuga qaytish"));
+    }
 }

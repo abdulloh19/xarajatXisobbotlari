@@ -54,10 +54,32 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId) {
-        return getExpenseConfirmationKeyboard(draftId, false, null);
+        return getExpenseConfirmationKeyboard(draftId, false, null, false);
     }
 
     public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId, boolean isOffDay, String lastWorkDayText) {
+        return getExpenseConfirmationKeyboard(draftId, isOffDay, lastWorkDayText, false);
+    }
+
+    public InlineKeyboardMarkup getExpenseConfirmationKeyboard(Long draftId, boolean isOffDay, String lastWorkDayText, boolean hasEnteredProfitToday) {
+        if (hasEnteredProfitToday) {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("💵 Kunlik foydadan", "draft:save_today_deduct:" + draftId),
+                                    new InlineKeyboardButton("💳 Alohida", "draft:save_today_separate:" + draftId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Oldingi kundan", "draft:save_yesterday:" + draftId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Tahrirlash", "draft:edit:" + draftId),
+                                    new InlineKeyboardButton("❌ Bekor qilish", "draft:cancel:" + draftId)
+                            )
+                    ))
+                    .build();
+        }
+
         if (isOffDay) {
             String label = (lastWorkDayText != null && !lastWorkDayText.isBlank())
                     ? "📅 Oldingi ishlagan kundan (" + lastWorkDayText + ")"
@@ -89,12 +111,16 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type) {
-        return getDraftConfirmationKeyboard(draftId, type, false, null);
+        return getDraftConfirmationKeyboard(draftId, type, false, null, false);
     }
 
     public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type, boolean isOffDay, String lastWorkDayText) {
+        return getDraftConfirmationKeyboard(draftId, type, isOffDay, lastWorkDayText, false);
+    }
+
+    public InlineKeyboardMarkup getDraftConfirmationKeyboard(Long draftId, TransactionType type, boolean isOffDay, String lastWorkDayText, boolean hasEnteredProfitToday) {
         if (type == TransactionType.EXPENSE) {
-            return getExpenseConfirmationKeyboard(draftId, isOffDay, lastWorkDayText);
+            return getExpenseConfirmationKeyboard(draftId, isOffDay, lastWorkDayText, hasEnteredProfitToday);
         }
         return getDraftConfirmationKeyboard(draftId);
     }
@@ -255,7 +281,18 @@ public class InlineKeyboardFactory {
                         List.of(
                                 new InlineKeyboardButton("📂 Kategoriyani o‘zgartirish", "tx:edit_field:" + transactionId + ":cat"),
                                 new InlineKeyboardButton("✏️ Tahrirlash", "tx:detail:" + transactionId)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("🏠 Asosiy menyuga qaytish", "menu:main")
                         )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getMainMenuReturnKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(new InlineKeyboardButton("🏠 Asosiy menyuga qaytish", "menu:main"))
                 ))
                 .build();
     }
