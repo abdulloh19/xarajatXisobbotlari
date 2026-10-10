@@ -13,20 +13,23 @@ public class ReplyKeyboardFactory {
                 .resizeKeyboard(true)
                 .keyboard(List.of(
                         List.of(
-                                new KeyboardButton("📅 Bugun"),
-                                new KeyboardButton("✅ Vazifalar")
-                        ),
-                        List.of(
                                 new KeyboardButton("💸 Xarajat qo‘shish"),
                                 new KeyboardButton("💰 Daromad qo‘shish")
                         ),
                         List.of(
-                                new KeyboardButton("💵 Foydani kiritish"),
-                                new KeyboardButton("📊 Statistika")
+                                new KeyboardButton("🎙 Ovoz bilan kiritish")
                         ),
                         List.of(
-                                new KeyboardButton("🤝 Qarzlar"),
+                                new KeyboardButton("📊 Bugungi statistika"),
+                                new KeyboardButton("📅 Haftalik statistika")
+                        ),
+                        List.of(
+                                new KeyboardButton("🗓 Oylik statistika"),
                                 new KeyboardButton("📜 Tarix")
+                        ),
+                        List.of(
+                                new KeyboardButton("💵 Foydani kiritish"),
+                                new KeyboardButton("🤝 Qarzlar")
                         ),
                         List.of(
                                 new KeyboardButton("📊 Hisobotlar"),
@@ -35,6 +38,9 @@ public class ReplyKeyboardFactory {
                         List.of(
                                 new KeyboardButton("⚙️ Sozlamalar"),
                                 new KeyboardButton("🔐 Kunni yopish")
+                        ),
+                        List.of(
+                                new KeyboardButton("✅ Vazifalar")
                         )
                 ))
                 .build();
@@ -130,12 +136,12 @@ public class ReplyKeyboardFactory {
                 .resizeKeyboard(true)
                 .keyboard(List.of(
                         List.of(
-                                new KeyboardButton("📜 Bugun"),
-                                new KeyboardButton("📜 Kecha")
+                                new KeyboardButton("📅 Bugun"),
+                                new KeyboardButton("📅 Kecha")
                         ),
                         List.of(
-                                new KeyboardButton("📜 Oxirgi 7 kun"),
-                                new KeyboardButton("📜 Shu oy")
+                                new KeyboardButton("📅 Oxirgi 7 kun"),
+                                new KeyboardButton("🗓 Shu oy")
                         ),
                         List.of(
                                 new KeyboardButton("⬅️ Asosiy menyu")

@@ -100,8 +100,20 @@ public class UpdateDispatcher {
                 Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("💵 Foydani kiritish").build();
                 textMessageHandler.handle(user, msg);
             }
+            case "/ovoz", "/voice" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🎙 Ovoz bilan kiritish").build();
+                textMessageHandler.handle(user, msg);
+            }
             case "/statistika", "/stats" -> {
-                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Statistika").build();
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Bugungi statistika").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/haftalik" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📅 Haftalik statistika").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/oylik" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🗓 Oylik statistika").build();
                 textMessageHandler.handle(user, msg);
             }
             case "/hisobot", "/hisobotlar", "/report" -> {

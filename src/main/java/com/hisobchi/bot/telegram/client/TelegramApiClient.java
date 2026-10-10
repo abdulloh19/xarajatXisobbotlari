@@ -227,7 +227,7 @@ public class TelegramApiClient {
         if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return false;
         try {
             Map<String, Object> body = Map.of(
-                    "menu_button", Map.of("type", "commands")
+                    "menu_button", Map.of("type", "default")
             );
             String json = executePost("setChatMenuButton", body);
             log.info("Telegram setChatMenuButton: {}", json);
@@ -257,15 +257,17 @@ public class TelegramApiClient {
             setChatMenuButtonDefault();
             setMyCommands(List.of(
                     Map.of("command", "start", "description", "🏠 Asosiy menyu"),
-                    Map.of("command", "bugun", "description", "📅 Bugungi kun sharhi"),
-                    Map.of("command", "vazifalar", "description", "✅ Vazifalar va eslatmalar"),
                     Map.of("command", "xarajat", "description", "💸 Xarajat qo‘shish"),
                     Map.of("command", "daromad", "description", "💰 Daromad qo‘shish"),
+                    Map.of("command", "ovoz", "description", "🎙 Ovoz bilan kiritish"),
                     Map.of("command", "foyda", "description", "💵 Kunlik foydani kiritish"),
                     Map.of("command", "statistika", "description", "📊 Bugungi statistika"),
+                    Map.of("command", "haftalik", "description", "📅 Haftalik statistika"),
+                    Map.of("command", "oylik", "description", "🗓 Oylik statistika"),
                     Map.of("command", "hisobot", "description", "📊 Davriy hisobotlar"),
                     Map.of("command", "qarzlar", "description", "🤝 Qarzlar daftari"),
                     Map.of("command", "tarix", "description", "📜 Operatsiyalar tarixi"),
+                    Map.of("command", "vazifalar", "description", "✅ Vazifalar va eslatmalar"),
                     Map.of("command", "kategoriya", "description", "📂 Yangi kategoriya qo‘shish"),
                     Map.of("command", "kunni_yopish", "description", "🔐 Kunni yopish"),
                     Map.of("command", "sozlamalar", "description", "⚙️ Sozlamalar"),
