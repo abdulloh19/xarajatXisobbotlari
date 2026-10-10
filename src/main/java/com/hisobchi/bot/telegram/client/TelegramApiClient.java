@@ -222,4 +222,57 @@ public class TelegramApiClient {
             return false;
         }
     }
+
+    public boolean setChatMenuButtonDefault() {
+        if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return false;
+        try {
+            Map<String, Object> body = Map.of(
+                    "menu_button", Map.of("type", "commands")
+            );
+            String json = executePost("setChatMenuButton", body);
+            log.info("Telegram setChatMenuButton: {}", json);
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to reset Telegram chat menu button: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean setMyCommands(List<Map<String, String>> commands) {
+        if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return false;
+        try {
+            Map<String, Object> body = Map.of("commands", commands);
+            String json = executePost("setMyCommands", body);
+            log.info("Telegram setMyCommands: {}", json);
+            return true;
+        } catch (Exception e) {
+            log.warn("Failed to set Telegram commands: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public void initBotMenuAndCommands() {
+        if (botConfig.getToken() == null || botConfig.getToken().isBlank()) return;
+        try {
+            setChatMenuButtonDefault();
+            setMyCommands(List.of(
+                    Map.of("command", "start", "description", "🏠 Asosiy menyu"),
+                    Map.of("command", "bugun", "description", "📅 Bugungi kun sharhi"),
+                    Map.of("command", "vazifalar", "description", "✅ Vazifalar va eslatmalar"),
+                    Map.of("command", "xarajat", "description", "💸 Xarajat qo‘shish"),
+                    Map.of("command", "daromad", "description", "💰 Daromad qo‘shish"),
+                    Map.of("command", "foyda", "description", "💵 Kunlik foydani kiritish"),
+                    Map.of("command", "statistika", "description", "📊 Bugungi statistika"),
+                    Map.of("command", "hisobot", "description", "📊 Davriy hisobotlar"),
+                    Map.of("command", "qarzlar", "description", "🤝 Qarzlar daftari"),
+                    Map.of("command", "tarix", "description", "📜 Operatsiyalar tarixi"),
+                    Map.of("command", "kategoriya", "description", "📂 Yangi kategoriya qo‘shish"),
+                    Map.of("command", "kunni_yopish", "description", "🔐 Kunni yopish"),
+                    Map.of("command", "sozlamalar", "description", "⚙️ Sozlamalar"),
+                    Map.of("command", "yordam", "description", "ℹ️ Yordam va qo‘llanma")
+            ));
+        } catch (Exception e) {
+            log.warn("Could not initialize Telegram bot menu and commands: {}", e.getMessage());
+        }
+    }
 }

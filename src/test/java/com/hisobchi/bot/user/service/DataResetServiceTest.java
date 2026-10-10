@@ -40,6 +40,14 @@ class DataResetServiceTest {
     private DebtRepository debtRepository;
     @Mock
     private UserBalanceRepository userBalanceRepository;
+    @Mock
+    private com.hisobchi.bot.todo.repository.TodoReminderLogRepository todoReminderLogRepository;
+    @Mock
+    private com.hisobchi.bot.todo.repository.TodoSubtaskRepository todoSubtaskRepository;
+    @Mock
+    private com.hisobchi.bot.todo.repository.TodoTaskRepository todoTaskRepository;
+    @Mock
+    private com.hisobchi.bot.todo.repository.TodoProjectRepository todoProjectRepository;
 
     @InjectMocks
     private DataResetService dataResetService;
@@ -92,6 +100,10 @@ class DataResetServiceTest {
 
         dataResetService.resetAllUserData(userId);
 
+        verify(todoReminderLogRepository).deleteByUserId(userId);
+        verify(todoSubtaskRepository).deleteByUserId(userId);
+        verify(todoTaskRepository).deleteByUserId(userId);
+        verify(todoProjectRepository).deleteByUserId(userId);
         verify(draftRepository).deleteByUserId(userId);
         verify(debtPaymentRepository).deleteByUserId(userId);
         verify(debtRepository).deleteByUserId(userId);

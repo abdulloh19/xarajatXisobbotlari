@@ -26,10 +26,18 @@ public class DataResetService {
     private final DebtPaymentRepository debtPaymentRepository;
     private final DebtRepository debtRepository;
     private final UserBalanceRepository userBalanceRepository;
+    private final com.hisobchi.bot.todo.repository.TodoReminderLogRepository todoReminderLogRepository;
+    private final com.hisobchi.bot.todo.repository.TodoSubtaskRepository todoSubtaskRepository;
+    private final com.hisobchi.bot.todo.repository.TodoTaskRepository todoTaskRepository;
+    private final com.hisobchi.bot.todo.repository.TodoProjectRepository todoProjectRepository;
 
     @Transactional
     public void resetAllUserData(Long userId) {
         log.info("Resetting all financial test data for user id: {}", userId);
+        todoReminderLogRepository.deleteByUserId(userId);
+        todoSubtaskRepository.deleteByUserId(userId);
+        todoTaskRepository.deleteByUserId(userId);
+        todoProjectRepository.deleteByUserId(userId);
         draftRepository.deleteByUserId(userId);
         debtPaymentRepository.deleteByUserId(userId);
         debtRepository.deleteByUserId(userId);

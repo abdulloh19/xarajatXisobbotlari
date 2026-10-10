@@ -69,6 +69,40 @@ public class TransactionService {
         return confirmAndSaveWithDate(draftId, userId, null);
     }
 
+    @Transactional
+    public TransactionDto createTransaction(
+            User user,
+            com.hisobchi.bot.transaction.entity.TransactionType type,
+            BigDecimal amount,
+            Category category,
+            String description,
+            com.hisobchi.bot.transaction.entity.TransactionSource source,
+            LocalDate date) {
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ValidationException("Summa 0 dan katta bo‘lishi kerak.");
+        }
+
+        LocalDate transactionDate = date != null ? date : DateTimeUtils.today(user.getTimezone());
+
+        Transaction transaction = Transaction.builder()
+                .user(user)
+                .category(category)
+                .type(type)
+                .amount(amount)
+                .currency(user.getCurrency() != null ? user.getCurrency() : "UZS")
+                .description(description)
+                .source(source != null ? source : com.hisobchi.bot.transaction.entity.TransactionSource.MANUAL)
+                .transactionDate(transactionDate)
+                .build();
+
+        Transaction saved = transactionRepository.save(transaction);
+        log.info("Direct transaction created id: {}, user: {}, amount: {}, type: {}, date: {}",
+                saved.getId(), user.getId(), saved.getAmount(), saved.getType(), transactionDate);
+
+        return toDto(saved);
+    }
+
     @Transactional(readOnly = true)
     public Transaction getByIdAndUser(Long transactionId, Long userId) {
         Transaction transaction = transactionRepository.findById(transactionId)

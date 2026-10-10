@@ -11,6 +11,7 @@ import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionType;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -157,6 +158,10 @@ public class InlineKeyboardFactory {
         }
 
         rows.add(List.of(
+                new InlineKeyboardButton("➕ Yangi kategoriya", "draft:add_cat:" + draftId)
+        ));
+
+        rows.add(List.of(
                 new InlineKeyboardButton("❌ Bekor qilish", "draft:cancel:" + draftId)
         ));
 
@@ -269,6 +274,10 @@ public class InlineKeyboardFactory {
         }
 
         rows.add(List.of(
+                new InlineKeyboardButton("➕ Yangi kategoriya", "tx:add_cat:" + transactionId)
+        ));
+
+        rows.add(List.of(
                 new InlineKeyboardButton("⬅️ Orqaga", "tx:detail:" + transactionId)
         ));
 
@@ -298,6 +307,10 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDailyOperationsKeyboard(List<Transaction> transactions, LocalDate date) {
+        return getDailyOperationsKeyboard(transactions, List.of(), date);
+    }
+
+    public InlineKeyboardMarkup getDailyOperationsKeyboard(List<Transaction> transactions, List<com.hisobchi.bot.debt.entity.Debt> debts, LocalDate date) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         if (transactions != null) {
             for (Transaction tx : transactions) {
@@ -311,6 +324,17 @@ public class InlineKeyboardFactory {
                 ));
             }
         }
+        if (debts != null) {
+            for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                String icon = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "💸 " : "💰 ";
+                String sign = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "-" : "+";
+                BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                String label = icon + d.getPersonName() + " (" + sign + MoneyFormatter.format(amt) + ")";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "debt:detail:" + d.getId())
+                ));
+            }
+        }
         rows.add(List.of(
                 new InlineKeyboardButton("⬅️ Tarix bo‘limi", "history:back")
         ));
@@ -318,9 +342,13 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getTransactionsListKeyboard(List<Transaction> transactions, int maxItems) {
+        return getTransactionsListKeyboard(transactions, List.of(), maxItems);
+    }
+
+    public InlineKeyboardMarkup getTransactionsListKeyboard(List<Transaction> transactions, List<com.hisobchi.bot.debt.entity.Debt> debts, int maxItems) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        int count = 0;
         if (transactions != null) {
-            int count = 0;
             for (Transaction tx : transactions) {
                 if (count >= maxItems) break;
                 String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
@@ -330,6 +358,19 @@ public class InlineKeyboardFactory {
                 String label = emoji + " " + name + " (" + prefix + MoneyFormatter.format(tx.getAmount()) + ")";
                 rows.add(List.of(
                         new InlineKeyboardButton(label, "tx:detail:" + tx.getId())
+                ));
+                count++;
+            }
+        }
+        if (debts != null) {
+            for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                if (count >= maxItems) break;
+                String icon = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "💸 " : "💰 ";
+                String sign = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "-" : "+";
+                BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                String label = icon + d.getPersonName() + " (" + sign + MoneyFormatter.format(amt) + ")";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "debt:detail:" + d.getId())
                 ));
                 count++;
             }
@@ -346,6 +387,10 @@ public class InlineKeyboardFactory {
                         List.of(
                                 new InlineKeyboardButton("🧾 Operatsiyalarni ko‘rish / tahrirlash", "tx:list_date:" + date),
                                 new InlineKeyboardButton("💵 Foydani o‘zgartirish", "profit:enter:" + date)
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("📅 Haftalik", "stats:weekly"),
+                                new InlineKeyboardButton("🗓 Oylik", "stats:monthly")
                         )
                 ))
                 .build();
@@ -365,6 +410,27 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDebtConfirmationKeyboard(Long draftId) {
+        return getDebtConfirmationKeyboard(draftId, com.hisobchi.bot.debt.entity.DebtType.BORROWED);
+    }
+
+    public InlineKeyboardMarkup getDebtConfirmationKeyboard(Long draftId, com.hisobchi.bot.debt.entity.DebtType type) {
+        if (type == com.hisobchi.bot.debt.entity.DebtType.LENT) {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("✅ Ha (Bugungi foydadan minus)", "debt:save_today:" + draftId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Oldingi kundan", "debt:save_yesterday:" + draftId),
+                                    new InlineKeyboardButton("❌ Yo‘q (Alohida)", "debt:save_separate:" + draftId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Tahrirlash", "debt:edit_ask:" + draftId),
+                                    new InlineKeyboardButton("❌ Bekor qilish", "debt:cancel:" + draftId)
+                            )
+                    ))
+                    .build();
+        }
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
@@ -501,11 +567,27 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDebtPaymentConfirmationKeyboard(Long debtId, String prefix, boolean isPay) {
-        String confirmText = isPay ? "✅ To‘lash" : "✅ Saqlash";
+        if (isPay) {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("✅ Ha (Bugungi foydadan minus)", prefix + ":confirm_today:" + debtId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Oldingi kundan", prefix + ":confirm_yesterday:" + debtId),
+                                    new InlineKeyboardButton("❌ Yo‘q (Alohida)", prefix + ":confirm_separate:" + debtId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("✏️ Summani o‘zgartirish", prefix + ":custom:" + debtId),
+                                    new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
+                            )
+                    ))
+                    .build();
+        }
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton(confirmText, prefix + ":confirm:" + debtId)
+                                new InlineKeyboardButton("✅ Saqlash", prefix + ":confirm:" + debtId)
                         ),
                         List.of(
                                 new InlineKeyboardButton("✏️ Summani o‘zgartirish", prefix + ":custom:" + debtId),
@@ -516,11 +598,26 @@ public class InlineKeyboardFactory {
     }
 
     public InlineKeyboardMarkup getDebtFullPaymentConfirmationKeyboard(Long debtId, String prefix, boolean isPay) {
-        String confirmText = isPay ? "✅ Ha, to‘lash" : "✅ Ha, qabul qilindi";
+        if (isPay) {
+            return InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(
+                                    new InlineKeyboardButton("✅ Ha (Bugungi foydadan minus)", prefix + ":confirm_full_today:" + debtId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("📅 Oldingi kundan", prefix + ":confirm_full_yesterday:" + debtId),
+                                    new InlineKeyboardButton("❌ Yo‘q (Alohida)", prefix + ":confirm_full_separate:" + debtId)
+                            ),
+                            List.of(
+                                    new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
+                            )
+                    ))
+                    .build();
+        }
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton(confirmText, prefix + ":confirm_full:" + debtId),
+                                new InlineKeyboardButton("✅ Ha, qabul qilindi", prefix + ":confirm_full:" + debtId),
                                 new InlineKeyboardButton("❌ Bekor qilish", prefix + ":cancel")
                         )
                 ))

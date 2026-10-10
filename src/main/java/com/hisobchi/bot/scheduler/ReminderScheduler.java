@@ -1,6 +1,7 @@
 package com.hisobchi.bot.scheduler;
 
 import com.hisobchi.bot.notification.service.ReminderService;
+import com.hisobchi.bot.todo.service.TodoReminderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,11 +13,13 @@ import org.springframework.stereotype.Component;
 public class ReminderScheduler {
 
     private final ReminderService reminderService;
+    private final TodoReminderService todoReminderService;
 
     // Run every minute at 00 seconds
     @Scheduled(cron = "0 * * * * *")
     public void runReminderCheck() {
         log.trace("Running scheduled reminder check...");
         reminderService.processRemindersForCurrentMinute();
+        todoReminderService.processDueReminders();
     }
 }

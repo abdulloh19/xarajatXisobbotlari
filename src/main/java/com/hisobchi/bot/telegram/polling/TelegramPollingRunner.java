@@ -30,6 +30,9 @@ public class TelegramPollingRunner implements CommandLineRunner, AutoCloseable {
             return;
         }
 
+        // Initialize Telegram Menu Button and Commands list
+        apiClient.initBotMenuAndCommands();
+
         if (botConfig.getWebhook() != null && botConfig.getWebhook().isEnabled()) {
             String webhookUrl = botConfig.getWebhook().getUrl();
             log.info("Telegram Webhook mode enabled. Setting webhook to: {}", webhookUrl);

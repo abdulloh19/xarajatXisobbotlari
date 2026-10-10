@@ -85,16 +85,71 @@ public class UpdateDispatcher {
     }
 
     private void handleCommand(User user, Long chatId, String command) {
-        if (command.startsWith("/start")) {
-            commandHandler.handleStart(user, chatId);
-        } else if (command.startsWith("/help")) {
-            commandHandler.handleHelp(user, chatId);
-        } else if (command.startsWith("/tx_")) {
-            commandHandler.handleTransactionDetailCommand(user, chatId, command);
-        } else if (command.startsWith("/debt_")) {
-            commandHandler.handleDebtDetailCommand(user, chatId, command);
-        } else {
-            commandHandler.handleHelp(user, chatId);
+        String cmd = command.toLowerCase().split("@")[0].trim();
+        switch (cmd) {
+            case "/start", "/menu", "/main", "/asosiy" -> commandHandler.handleStart(user, chatId);
+            case "/xarajat" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("💸 Xarajat qo‘shish").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/daromad" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("💰 Daromad qo‘shish").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/foyda" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("💵 Foydani kiritish").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/statistika", "/stats" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Statistika").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/hisobot", "/hisobotlar", "/report" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Hisobotlar").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/qarzlar", "/qarz", "/debts" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🤝 Qarzlar").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/tarix", "/history" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📜 Tarix").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/kategoriya", "/kategoriyalar" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("➕ Yangi kategoriya").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/kunni_yopish" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🔐 Kunni yopish").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/sozlamalar", "/settings" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("⚙️ Sozlamalar").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/vazifalar", "/vazifa", "/todo", "/tasks", "/reja" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("✅ Vazifalar").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/bugun" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📅 Bugun").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/loyihalar", "/projects" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📁 Loyihalar").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/help", "/yordam" -> commandHandler.handleHelp(user, chatId);
+            default -> {
+                if (command.startsWith("/tx_")) {
+                    commandHandler.handleTransactionDetailCommand(user, chatId, command);
+                } else if (command.startsWith("/debt_")) {
+                    commandHandler.handleDebtDetailCommand(user, chatId, command);
+                } else {
+                    commandHandler.handleHelp(user, chatId);
+                }
+            }
         }
     }
 

@@ -32,6 +32,15 @@ class ReportServiceTest {
     @Mock
     private DailyProfitService dailyProfitService;
 
+    @Mock
+    private com.hisobchi.bot.debt.repository.DebtRepository debtRepository;
+
+    @Mock
+    private com.hisobchi.bot.debt.repository.DebtPaymentRepository debtPaymentRepository;
+
+    @Mock
+    private com.hisobchi.bot.user.service.BalanceService balanceService;
+
     @InjectMocks
     private ReportService reportService;
 

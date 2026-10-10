@@ -151,6 +151,45 @@ public class DailyProfitService {
     }
 
     @Transactional
+    public DailyProfit deductFromProfitOnly(User user, LocalDate date, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return getProfit(user.getId(), date).orElse(null);
+        }
+        DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
+                .orElseGet(() -> {
+                    BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+                    return DailyProfit.builder()
+                            .user(user)
+                            .profitDate(date)
+                            .cashAmount(inc != null ? inc : BigDecimal.ZERO)
+                            .cardAmount(BigDecimal.ZERO)
+                            .isWorkDay(true)
+                            .build();
+                });
+        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+
+        BigDecimal newCash = currentCash.subtract(amount);
+        BigDecimal newCard = currentCard;
+        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal deficit = newCash.abs();
+            newCash = BigDecimal.ZERO;
+            newCard = currentCard.subtract(deficit);
+            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
+                newCard = BigDecimal.ZERO;
+            }
+        }
+        p.setCashAmount(newCash);
+        p.setCardAmount(newCard);
+        p.setTotalProfit(newCash.add(newCard));
+        p.setWorkDay(true);
+        DailyProfit saved = dailyProfitRepository.save(p);
+        log.info("Deducted {} from profit ONLY (no balance double-delta) for user {} on {}: new total={}",
+                amount, user.getId(), date, saved.getTotalProfit());
+        return saved;
+    }
+
+    @Transactional
     public DailyProfit addToProfit(User user, LocalDate date, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return getProfit(user.getId(), date).orElse(null);

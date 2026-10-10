@@ -57,6 +57,30 @@ public class NotificationSettings {
     @Builder.Default
     private String dailyReportTime = "23:00";
 
+    @Column(name = "quiet_hours_enabled", nullable = false)
+    @Builder.Default
+    private Boolean quietHoursEnabled = true;
+
+    @Column(name = "quiet_hours_start", nullable = false, length = 10)
+    @Builder.Default
+    private String quietHoursStart = "23:00";
+
+    @Column(name = "quiet_hours_end", nullable = false, length = 10)
+    @Builder.Default
+    private String quietHoursEnd = "07:00";
+
+    @Column(name = "todo_daily_brief_enabled", nullable = false)
+    @Builder.Default
+    private Boolean todoDailyBriefEnabled = true;
+
+    @Column(name = "todo_daily_brief_time", nullable = false, length = 10)
+    @Builder.Default
+    private String todoDailyBriefTime = "08:30";
+
+    @Column(name = "todo_weekly_review_enabled", nullable = false)
+    @Builder.Default
+    private Boolean todoWeeklyReviewEnabled = true;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

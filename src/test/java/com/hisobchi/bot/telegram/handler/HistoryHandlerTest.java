@@ -39,6 +39,12 @@ class HistoryHandlerTest {
     private UserService userService;
     @Mock
     private TransactionRepository transactionRepository;
+    @Mock
+    private com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
+    @Mock
+    private com.hisobchi.bot.debt.repository.DebtRepository debtRepository;
+    @Mock
+    private com.hisobchi.bot.debt.repository.DebtPaymentRepository debtPaymentRepository;
 
     @Spy
     private ReplyKeyboardFactory replyKeyboardFactory = new ReplyKeyboardFactory();
@@ -173,6 +179,30 @@ class HistoryHandlerTest {
         textMessageHandler.handle(user, msg);
 
         assertNull(textMessageHandler.getUserActiveMenu(user.getId()));
+    }
+
+    @Test
+    @DisplayName("Clicking '📜 Bugun' directly queries today transactions, debts, payments, profit")
+    void testClickDirectBugunHistory() {
+        when(transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(eq(user.getId()), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        Message msg = createTextMessage("📜 Bugun");
+        textMessageHandler.handle(user, msg);
+
+        verify(transactionRepository).findByUserIdAndTransactionDateOrderByCreatedAtAsc(eq(user.getId()), any(LocalDate.class));
+        verify(apiClient).sendMessage(eq(chatId), anyString(), any(InlineKeyboardMarkup.class), eq("HTML"));
+    }
+
+    @Test
+    @DisplayName("Clicking '📜 Tarix' while in WAITING_EXPENSE_AMOUNT breaks out of state and opens history menu")
+    void testHistoryMenuBreaksOutOfState() {
+        user.setState(UserState.WAITING_EXPENSE_AMOUNT);
+        Message msg = createTextMessage("📜 Tarix");
+        textMessageHandler.handle(user, msg);
+
+        verify(userService).updateState(eq(user.getTelegramId()), eq(UserState.IDLE));
+        verify(apiClient).sendMessage(eq(chatId), contains("Tarix bo‘limi"), any(ReplyKeyboardMarkup.class), eq("HTML"));
     }
 
     @Test

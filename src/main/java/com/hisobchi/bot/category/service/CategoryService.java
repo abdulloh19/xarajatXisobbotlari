@@ -141,4 +141,15 @@ public class CategoryService {
     public Category createCustomCategory(User user, String name, String emoji, TransactionType type) {
         return createCustomCategory(user, name, emoji, CategoryType.from(type));
     }
+
+    @Transactional
+    public Category getOrCreateCategory(User user, String name, String emoji, TransactionType type) {
+        if (name == null || name.isBlank()) {
+            throw new ValidationException("Kategoriya nomi bo‘sh bo‘lishi mumkin emas");
+        }
+        String cleanName = name.trim();
+        CategoryType catType = CategoryType.from(type);
+        return categoryRepository.findByUserIdAndNameIgnoreCaseAndType(user.getId(), cleanName, catType)
+                .orElseGet(() -> createCustomCategory(user, cleanName, emoji, catType));
+    }
 }

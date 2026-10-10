@@ -38,6 +38,18 @@ public class ReportService {
         BigDecimal expense = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.EXPENSE, date);
         if (expense == null) expense = BigDecimal.ZERO;
 
+        BigDecimal lentDebt = debtRepository != null
+                ? debtRepository.sumCreatedAmountByUserIdAndTypeAndDate(userId, com.hisobchi.bot.debt.entity.DebtType.LENT, date)
+                : BigDecimal.ZERO;
+        if (lentDebt == null) lentDebt = BigDecimal.ZERO;
+
+        BigDecimal paidDebt = debtPaymentRepository != null
+                ? debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDate(userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT, date)
+                : BigDecimal.ZERO;
+        if (paidDebt == null) paidDebt = BigDecimal.ZERO;
+
+        BigDecimal totalExpense = expense.add(lentDebt).add(paidDebt);
+
         Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(userId, date);
 
         BigDecimal cash = BigDecimal.ZERO;
@@ -60,15 +72,30 @@ public class ReportService {
         }
 
         // Section 64: JAMI ISHLANGAN = XARAJAT + USER KIRITGAN FOYDA
-        BigDecimal totalEarned = expense.add(profit);
-        List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesByDate(userId, TransactionType.EXPENSE, date);
+        BigDecimal totalEarned = totalExpense.add(profit);
+        List<CategoryExpenseDto> categories = new ArrayList<>(
+                transactionRepository.findCategoryExpensesByDate(userId, TransactionType.EXPENSE, date)
+        );
+        if (lentDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long lentCount = debtRepository != null
+                    ? debtRepository.countCreatedByUserIdAndTypeAndDate(userId, com.hisobchi.bot.debt.entity.DebtType.LENT, date)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "Berilgan qarz", "🤝", lentDebt, Math.max(1, lentCount)));
+        }
+        if (paidDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long paidCount = debtPaymentRepository != null
+                    ? debtPaymentRepository.countByUserIdAndPaymentTypeAndPaymentDate(userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT, date)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidCount)));
+        }
+        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
         return ReportData.builder()
                 .title("BUGUNGI YAKUNIY HISOBOT")
                 .periodStart(date)
                 .periodEnd(date)
                 .totalEarned(totalEarned)
-                .totalExpense(expense)
+                .totalExpense(totalExpense)
                 .totalProfit(profit)
                 .cashProfit(cash)
                 .cardProfit(card)
@@ -86,6 +113,18 @@ public class ReportService {
         BigDecimal expense = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
                 userId, TransactionType.EXPENSE, start, end);
         if (expense == null) expense = BigDecimal.ZERO;
+
+        BigDecimal lentDebt = debtRepository != null
+                ? debtRepository.sumCreatedAmountByUserIdAndTypeAndDateBetween(userId, com.hisobchi.bot.debt.entity.DebtType.LENT, start, end)
+                : BigDecimal.ZERO;
+        if (lentDebt == null) lentDebt = BigDecimal.ZERO;
+
+        BigDecimal paidDebt = debtPaymentRepository != null
+                ? debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDateBetween(userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT, start, end)
+                : BigDecimal.ZERO;
+        if (paidDebt == null) paidDebt = BigDecimal.ZERO;
+
+        BigDecimal totalExpense = expense.add(lentDebt).add(paidDebt);
 
         List<DailyProfit> profitList = dailyProfitService.getProfitsBetween(userId, start, end);
         Map<LocalDate, DailyProfit> profitMap = new HashMap<>();
@@ -129,7 +168,7 @@ public class ReportService {
         }
 
         // Section 64: totalEarned = SUM(each day's expense + each day's profit)
-        BigDecimal totalEarned = expense.add(profitSum);
+        BigDecimal totalEarned = totalExpense.add(profitSum);
 
         long txActiveDays = transactionRepository.countActiveDaysBetween(userId, start, end);
         long activeDays = Math.max(txActiveDays, completedDays);
@@ -137,15 +176,30 @@ public class ReportService {
             activeDays = 1;
         }
 
-        List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesBetween(
-                userId, TransactionType.EXPENSE, start, end);
+        List<CategoryExpenseDto> categories = new ArrayList<>(
+                transactionRepository.findCategoryExpensesBetween(
+                        userId, TransactionType.EXPENSE, start, end)
+        );
+        if (lentDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long lentCount = debtRepository != null
+                    ? debtRepository.countCreatedByUserIdAndTypeAndDateBetween(userId, com.hisobchi.bot.debt.entity.DebtType.LENT, start, end)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "Berilgan qarz", "🤝", lentDebt, Math.max(1, lentCount)));
+        }
+        if (paidDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long paidCount = debtPaymentRepository != null
+                    ? debtPaymentRepository.countByUserIdAndPaymentTypeAndPaymentDateBetween(userId, com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT, start, end)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidCount)));
+        }
+        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
         return ReportData.builder()
                 .title(title)
                 .periodStart(start)
                 .periodEnd(end)
                 .totalEarned(totalEarned)
-                .totalExpense(expense)
+                .totalExpense(totalExpense)
                 .totalProfit(profitSum)
                 .cashProfit(cashSum)
                 .cardProfit(cardSum)

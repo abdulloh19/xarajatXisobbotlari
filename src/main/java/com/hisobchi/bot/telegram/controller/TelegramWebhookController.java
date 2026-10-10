@@ -1,6 +1,7 @@
 package com.hisobchi.bot.telegram.controller;
 
 import com.hisobchi.bot.config.BotConfig;
+import com.hisobchi.bot.telegram.client.TelegramApiClient;
 import com.hisobchi.bot.telegram.client.model.TelegramModels.Update;
 import com.hisobchi.bot.telegram.handler.UpdateDispatcher;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,15 @@ public class TelegramWebhookController {
 
     private final UpdateDispatcher updateDispatcher;
     private final BotConfig botConfig;
+    private final TelegramApiClient apiClient;
     private final ExecutorService updateExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    @GetMapping("/init-menu")
+    @PostMapping("/init-menu")
+    public ResponseEntity<String> initMenu() {
+        apiClient.initBotMenuAndCommands();
+        return ResponseEntity.ok("Telegram menu and commands initialized successfully!");
+    }
 
     @PostMapping("/webhook")
     public ResponseEntity<Void> handleWebhook(

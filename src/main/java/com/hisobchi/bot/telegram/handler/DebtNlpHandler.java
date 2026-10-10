@@ -205,7 +205,7 @@ public class DebtNlpHandler {
                     );
                     String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(debtDraft);
                     apiClient.sendMessage(chatId, confirmMsg,
-                            inlineKeyboardFactory.getDebtConfirmationKeyboard(debtDraft.getId()), "HTML");
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(debtDraft.getId(), debtDraft.getType()), "HTML");
                 }
             }
             case BORROW -> {
@@ -222,7 +222,7 @@ public class DebtNlpHandler {
                     );
                     String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(debtDraft);
                     apiClient.sendMessage(chatId, confirmMsg,
-                            inlineKeyboardFactory.getDebtConfirmationKeyboard(debtDraft.getId()), "HTML");
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(debtDraft.getId(), debtDraft.getType()), "HTML");
                 }
             }
         }

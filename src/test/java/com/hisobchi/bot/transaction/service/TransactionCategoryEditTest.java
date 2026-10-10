@@ -125,6 +125,26 @@ class TransactionCategoryEditTest {
 
         String callback1 = markup.getInlineKeyboard().get(0).get(1).getCallbackData();
         assertEquals("tx:set_cat:100:20", callback1);
+
+        // Yangi kategoriya tugmasi tekshiriladi
+        String addCatCallback = markup.getInlineKeyboard().get(1).get(0).getCallbackData();
+        assertEquals("tx:add_cat:100", addCatCallback);
+        assertEquals("➕ Yangi kategoriya", markup.getInlineKeyboard().get(1).get(0).getText());
+    }
+
+    @Test
+    @DisplayName("Draft uchun kategoriya tanlash klaviaturasida yangi kategoriya tugmasi mavjud")
+    void testDraftCategorySelectionKeyboard() {
+        InlineKeyboardFactory factory = new InlineKeyboardFactory();
+        List<Category> categories = List.of(fuelCat, foodCat);
+
+        InlineKeyboardMarkup markup = factory.getCategorySelectionKeyboard(55L, categories);
+
+        assertNotNull(markup);
+        assertEquals("draft:set_cat:55:10", markup.getInlineKeyboard().get(0).get(0).getCallbackData());
+        assertEquals("draft:add_cat:55", markup.getInlineKeyboard().get(1).get(0).getCallbackData());
+        assertEquals("➕ Yangi kategoriya", markup.getInlineKeyboard().get(1).get(0).getText());
+        assertEquals("draft:cancel:55", markup.getInlineKeyboard().get(2).get(0).getCallbackData());
     }
 
     @Test

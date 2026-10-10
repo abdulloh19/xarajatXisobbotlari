@@ -69,6 +69,44 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
             @Param("type") DebtType type,
             @Param("date") LocalDate date);
 
+    @Query("SELECT COALESCE(SUM(COALESCE(d.originalAmount, d.amount)), 0) FROM Debt d " +
+           "WHERE d.user.id = :userId AND d.type = :type AND ((d.startDate BETWEEN :start AND :end) OR (d.borrowedOrLentDate BETWEEN :start AND :end))")
+    BigDecimal sumCreatedAmountByUserIdAndTypeAndDateBetween(
+            @Param("userId") Long userId,
+            @Param("type") DebtType type,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    @Query("SELECT COUNT(d) FROM Debt d " +
+           "WHERE d.user.id = :userId AND d.type = :type AND (d.startDate = :date OR d.borrowedOrLentDate = :date)")
+    long countCreatedByUserIdAndTypeAndDate(
+            @Param("userId") Long userId,
+            @Param("type") DebtType type,
+            @Param("date") LocalDate date);
+
+    @Query("SELECT COUNT(d) FROM Debt d " +
+           "WHERE d.user.id = :userId AND d.type = :type AND ((d.startDate BETWEEN :start AND :end) OR (d.borrowedOrLentDate BETWEEN :start AND :end))")
+    long countCreatedByUserIdAndTypeAndDateBetween(
+            @Param("userId") Long userId,
+            @Param("type") DebtType type,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
+    @Query("SELECT d FROM Debt d " +
+           "WHERE d.user.id = :userId AND (d.startDate = :date OR d.borrowedOrLentDate = :date) " +
+           "ORDER BY d.createdAt ASC")
+    List<Debt> findAllCreatedByUserIdAndDate(
+            @Param("userId") Long userId,
+            @Param("date") LocalDate date);
+
+    @Query("SELECT d FROM Debt d " +
+           "WHERE d.user.id = :userId AND ((d.startDate BETWEEN :start AND :end) OR (d.borrowedOrLentDate BETWEEN :start AND :end)) " +
+           "ORDER BY d.createdAt DESC")
+    List<Debt> findAllCreatedByUserIdAndDateBetween(
+            @Param("userId") Long userId,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
     long countByUserIdAndTypeAndStatusIn(
             Long userId, DebtType type, Collection<DebtStatus> statuses);
 

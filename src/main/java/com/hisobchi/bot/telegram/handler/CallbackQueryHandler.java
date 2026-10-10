@@ -71,6 +71,7 @@ public class CallbackQueryHandler {
     private final com.hisobchi.bot.user.service.BalanceService balanceService;
     private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
     private final com.hisobchi.bot.user.service.DataResetService dataResetService;
+    private final com.hisobchi.bot.todo.handler.TodoCallbackHandler todoCallbackHandler;
 
     public void handle(User user, CallbackQuery callback) {
         String data = callback.getData();
@@ -87,6 +88,7 @@ public class CallbackQueryHandler {
         String prefix = parts[0];
 
         switch (prefix) {
+            case "todo" -> todoCallbackHandler.handle(user, chatId, messageId, parts);
             case "draft" -> handleDraftCallback(user, chatId, messageId, parts);
             case "day" -> handleDayCallback(user, chatId, messageId, parts);
             case "tx" -> handleTransactionCallback(user, chatId, messageId, parts);
@@ -100,6 +102,7 @@ public class CallbackQueryHandler {
             case "reminder" -> handleReminderCallback(user, chatId, messageId, parts);
             case "report" -> handleReportCallback(user, chatId, messageId, parts);
             case "data" -> handleDataCallback(user, chatId, messageId, parts);
+            case "stats" -> handleStatsCallback(user, chatId, messageId, parts);
             case "menu" -> {
                 if (parts.length > 1 && "main".equals(parts[1])) {
                     userService.updateState(user.getTelegramId(), UserState.IDLE);
@@ -113,6 +116,19 @@ public class CallbackQueryHandler {
                 }
             }
             default -> log.warn("Unknown callback query: {}", data);
+        }
+    }
+
+    private void handleStatsCallback(User user, Long chatId, Integer messageId, String[] parts) {
+        LocalDate today = DateTimeUtils.today(user.getTimezone());
+        if (parts.length > 1 && "weekly".equals(parts[1])) {
+            com.hisobchi.bot.statistics.dto.WeeklyStatisticsDto stats = statisticsService.getWeeklyStatistics(user, today);
+            String msg = BotMessageBuilder.buildWeeklyStatisticsMessage(stats);
+            apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+        } else if (parts.length > 1 && "monthly".equals(parts[1])) {
+            com.hisobchi.bot.statistics.dto.MonthlyStatisticsDto stats = statisticsService.getMonthlyStatistics(user, today);
+            String msg = BotMessageBuilder.buildMonthlyStatisticsMessage(stats);
+            apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
         }
     }
 
@@ -209,7 +225,7 @@ public class CallbackQueryHandler {
         Long id = (parts.length > 2 && !parts[2].isBlank() && !"cancel_ext".equals(action)) ? Long.parseLong(parts[2]) : null;
 
         switch (action) {
-            case "save" -> {
+            case "save", "save_today", "save_yesterday", "save_separate" -> {
                 String actionKey = "save_debt_draft_" + id;
                 if (!idempotencyService.tryAcquireAction(actionKey)) return;
 
@@ -218,11 +234,26 @@ public class CallbackQueryHandler {
                     Debt saved = debtService.saveFromDraft(draftOpt.get());
                     BigDecimal available = balanceService.getAvailableBalance(user.getId());
 
+                    String profitNote = "";
+                    if (saved.getType() == DebtType.LENT) {
+                        if ("save_today".equals(action)) {
+                            LocalDate today = DateTimeUtils.today(user.getTimezone());
+                            dailyProfitService.deductFromProfitOnly(user, today, saved.getAmount());
+                            profitNote = "\n<i>(Bugungi foydadan ayirildi)</i>\n";
+                        } else if ("save_yesterday".equals(action)) {
+                            LocalDate today = DateTimeUtils.today(user.getTimezone());
+                            LocalDate targetDate = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                                    .map(com.hisobchi.bot.profit.entity.DailyProfit::getProfitDate)
+                                    .orElse(today.minusDays(1));
+                            dailyProfitService.deductFromProfitOnly(user, targetDate, saved.getAmount());
+                            profitNote = "\n<i>(Oldingi kungi foydadan ayirildi)</i>\n";
+                        }
+                    }
+
                     String msg;
                     if (saved.getType() == DebtType.LENT) {
                         msg = String.format("""
-                                ✅ <b>Qarz saqlandi</b>
-
+                                ✅ <b>Qarz saqlandi</b>%s
                                 👤 <b>%s</b>
                                 💸 Qarz berdingiz:
                                 <b>%s</b>
@@ -233,6 +264,7 @@ public class CallbackQueryHandler {
                                 💰 Sizda hozir qoldi:
                                 <b>%s</b>
                                 """,
+                                profitNote,
                                 BotMessageBuilder.escapeHtml(saved.getPersonName()),
                                 MoneyFormatter.format(saved.getAmount()),
                                 BotMessageBuilder.escapeHtml(saved.getPersonName()),
@@ -323,7 +355,7 @@ public class CallbackQueryHandler {
             case "dismiss" -> {
                 apiClient.editMessageText(chatId, messageId, "👍 Tushunarli, eslatib turamiz.", null, null);
             }
-            case "view" -> {
+            case "view", "detail" -> {
                 var debtOpt = debtService.getDebt(id, user.getId());
                 if (debtOpt.isPresent()) {
                     Debt d = debtOpt.get();
@@ -351,7 +383,7 @@ public class CallbackQueryHandler {
                 debtDraftService.findValidDraft(id, user.getId()).ifPresent(d -> {
                     String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(d);
                     apiClient.editMessageText(chatId, messageId, confirmMsg,
-                            inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId()), "HTML");
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId(), d.getType()), "HTML");
                 });
             }
             case "cancel_create" -> {
@@ -399,7 +431,7 @@ public class CallbackQueryHandler {
 
             String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
             apiClient.editMessageText(chatId, messageId, confirmMsg,
-                    inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                    inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
         }
     }
 
@@ -495,9 +527,9 @@ public class CallbackQueryHandler {
 
                                 💵 To‘lov turi: <b>%s</b>
 
-                                Shundan keyin bu qarz to‘liq yopiladi.
+                                🤔 <b>Bu qarz to‘lovi qaysi foydadan qilindi? Bugungimi?</b>
 
-                                Davom etamizmi?
+                                Shundan keyin bu qarz to‘liq yopiladi.
                                 """,
                                 BotMessageBuilder.escapeHtml(debt.getPersonName()),
                                 MoneyFormatter.format(session.getPaymentAmount()),
@@ -524,7 +556,7 @@ public class CallbackQueryHandler {
 
                                 💵 To‘lov turi: <b>%s</b>
 
-                                Tasdiqlaysizmi?
+                                🤔 <b>Bu qarz to‘lovi qaysi foydadan qilindi? Bugungimi?</b>
                                 """,
                                 BotMessageBuilder.escapeHtml(debt.getPersonName()),
                                 MoneyFormatter.format(payAmt),
@@ -537,7 +569,7 @@ public class CallbackQueryHandler {
                     }
                 }
             }
-            case "confirm" -> {
+            case "confirm", "confirm_today", "confirm_yesterday", "confirm_separate" -> {
                 Long debtId = Long.parseLong(parts[2]);
                 String actionKey = "debt_pay_confirm_" + debtId + "_" + messageId;
                 if (!idempotencyService.tryAcquireAction(actionKey)) return;
@@ -546,13 +578,27 @@ public class CallbackQueryHandler {
                 String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
                 BigDecimal payAmt = (session != null && session.getPaymentAmount() != null) ? session.getPaymentAmount() : BigDecimal.ZERO;
                 com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makePartialPayment(debtId, user.getId(), payAmt, method, TransactionSource.MANUAL);
+
+                String profitNote = "";
+                if ("confirm_today".equals(action)) {
+                    LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    dailyProfitService.deductFromProfitOnly(user, today, payAmt);
+                    profitNote = "\n<i>(Bugungi foydadan ayirildi)</i>\n";
+                } else if ("confirm_yesterday".equals(action)) {
+                    LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    LocalDate targetDate = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                            .map(com.hisobchi.bot.profit.entity.DailyProfit::getProfitDate)
+                            .orElse(today.minusDays(1));
+                    dailyProfitService.deductFromProfitOnly(user, targetDate, payAmt);
+                    profitNote = "\n<i>(Oldingi kungi foydadan ayirildi)</i>\n";
+                }
+
                 Debt updated = payment.getDebt();
                 BigDecimal available = balanceService.getAvailableBalance(user.getId());
                 debtFlowService.clearSession(user.getId());
 
                 String msg = String.format("""
-                        ✅ <b>To‘lov saqlandi</b>
-
+                        ✅ <b>To‘lov saqlandi</b>%s
                         👤 <b>%s</b>
 
                         💳 To‘ladingiz:
@@ -567,6 +613,7 @@ public class CallbackQueryHandler {
                         💰 Sizda mavjud:
                         <b>%s</b>
                         """,
+                        profitNote,
                         BotMessageBuilder.escapeHtml(updated.getPersonName()),
                         MoneyFormatter.format(payAmt),
                         MoneyFormatter.format(updated.getRemainingAmount().add(payAmt)),
@@ -575,7 +622,7 @@ public class CallbackQueryHandler {
                 );
                 apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
             }
-            case "confirm_full" -> {
+            case "confirm_full", "confirm_full_today", "confirm_full_yesterday", "confirm_full_separate" -> {
                 Long debtId = Long.parseLong(parts[2]);
                 String actionKey = "debt_pay_full_confirm_" + debtId + "_" + messageId;
                 if (!idempotencyService.tryAcquireAction(actionKey)) return;
@@ -583,13 +630,27 @@ public class CallbackQueryHandler {
                 var session = debtFlowService.getSession(user.getId());
                 String method = (session != null && session.getPaymentMethod() != null) ? session.getPaymentMethod() : "Naqd";
                 com.hisobchi.bot.debt.entity.DebtPayment payment = debtService.makeFullPayment(debtId, user.getId(), method, TransactionSource.MANUAL);
+
+                String profitNote = "";
+                if ("confirm_full_today".equals(action)) {
+                    LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    dailyProfitService.deductFromProfitOnly(user, today, payment.getAmount());
+                    profitNote = "\n<i>(Bugungi foydadan ayirildi)</i>\n";
+                } else if ("confirm_full_yesterday".equals(action)) {
+                    LocalDate today = DateTimeUtils.today(user.getTimezone());
+                    LocalDate targetDate = dailyProfitService.getLastWorkedDayProfit(user.getId(), today)
+                            .map(com.hisobchi.bot.profit.entity.DailyProfit::getProfitDate)
+                            .orElse(today.minusDays(1));
+                    dailyProfitService.deductFromProfitOnly(user, targetDate, payment.getAmount());
+                    profitNote = "\n<i>(Oldingi kungi foydadan ayirildi)</i>\n";
+                }
+
                 Debt updated = payment.getDebt();
                 BigDecimal available = balanceService.getAvailableBalance(user.getId());
                 debtFlowService.clearSession(user.getId());
 
                 String msg = String.format("""
-                        ✅ <b>Qarz to‘liq yopildi</b>
-
+                        ✅ <b>Qarz to‘liq yopildi</b>%s
                         👤 <b>%s</b>
                         💰 To‘landi: <b>%s</b>
                         📌 Qoldiq: <b>0 so‘m</b>
@@ -597,6 +658,7 @@ public class CallbackQueryHandler {
                         💰 Sizda mavjud:
                         <b>%s</b>
                         """,
+                        profitNote,
                         BotMessageBuilder.escapeHtml(updated.getPersonName()),
                         MoneyFormatter.format(updated.getOriginalAmount()),
                         MoneyFormatter.format(available)
@@ -1040,6 +1102,13 @@ public class CallbackQueryHandler {
                     }
                 }
             }
+            case "add_cat" -> {
+                textMessageHandler.setUserDraftAddingCatId(user.getId(), draftId);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_CATEGORY_EDIT);
+                apiClient.sendMessage(chatId,
+                        "➕ <b>Yangi kategoriya nomini kiriting:</b>\n\nMasalan: <i>Kiyim</i>, <i>Usta xizmati</i> yoki <i>Mijozdan to‘lov</i>",
+                        replyKeyboardFactory.getCancelMenu(), "HTML");
+            }
             case "set_cat" -> {
                 Long categoryId = Long.parseLong(parts[3]);
                 Category cat = categoryService.getById(categoryId, user.getId());
@@ -1323,6 +1392,13 @@ public class CallbackQueryHandler {
                         apiClient.sendMessage(chatId, "Yangi izohni kiriting:", replyKeyboardFactory.getCancelMenu(), null);
                     }
                 }
+            }
+            case "add_cat" -> {
+                textMessageHandler.setUserTxAddingCatId(user.getId(), txId);
+                userService.updateState(user.getTelegramId(), UserState.WAITING_CATEGORY_EDIT);
+                apiClient.sendMessage(chatId,
+                        "➕ <b>Yangi kategoriya nomini kiriting:</b>\n\nMasalan: <i>Kiyim</i>, <i>Usta xizmati</i> yoki <i>Mijozdan to‘lov</i>",
+                        replyKeyboardFactory.getCancelMenu(), "HTML");
             }
             case "set_cat" -> {
                 Long categoryId = Long.parseLong(parts[3]);

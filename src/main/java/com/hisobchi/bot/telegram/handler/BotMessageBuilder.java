@@ -259,17 +259,66 @@ public final class BotMessageBuilder {
     }
 
     public static String buildDayTransactionsHistoryDetailed(LocalDate date, List<Transaction> list, String timezone) {
-        if (list == null || list.isEmpty()) {
+        return buildDayTransactionsHistoryDetailed(date, list, List.of(), List.of(), null, timezone);
+    }
+
+    public static String buildDayTransactionsHistoryDetailed(
+            LocalDate date,
+            List<Transaction> list,
+            List<com.hisobchi.bot.debt.entity.Debt> debts,
+            List<com.hisobchi.bot.debt.entity.DebtPayment> payments,
+            com.hisobchi.bot.profit.entity.DailyProfit profit,
+            String timezone) {
+
+        boolean hasTxs = list != null && !list.isEmpty();
+        boolean hasDebts = debts != null && !debts.isEmpty();
+        boolean hasPayments = payments != null && !payments.isEmpty();
+        boolean hasProfit = profit != null && profit.getTotalProfit() != null && profit.getTotalProfit().compareTo(BigDecimal.ZERO) > 0;
+
+        if (!hasTxs && !hasDebts && !hasPayments && !hasProfit) {
             return "ℹ️ <b>" + DateTimeUtils.formatUzbekDate(date) + "</b> kuni hech qanday operatsiya topilmadi.";
         }
 
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
-        for (Transaction tx : list) {
-            if (tx.getType() == TransactionType.INCOME) {
-                income = income.add(tx.getAmount());
-            } else {
-                expense = expense.add(tx.getAmount());
+        int opCount = 0;
+
+        if (hasProfit) {
+            income = income.add(profit.getTotalProfit());
+            opCount++;
+        }
+
+        if (hasTxs) {
+            for (Transaction tx : list) {
+                if (tx.getType() == TransactionType.INCOME) {
+                    income = income.add(tx.getAmount());
+                } else {
+                    expense = expense.add(tx.getAmount());
+                }
+                opCount++;
+            }
+        }
+
+        if (hasDebts) {
+            for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                if (d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT) {
+                    expense = expense.add(amt);
+                } else {
+                    income = income.add(amt);
+                }
+                opCount++;
+            }
+        }
+
+        if (hasPayments) {
+            for (com.hisobchi.bot.debt.entity.DebtPayment p : payments) {
+                if (p.getPaymentType() == com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT) {
+                    expense = expense.add(p.getAmount());
+                } else {
+                    income = income.add(p.getAmount());
+                }
+                opCount++;
             }
         }
 
@@ -281,42 +330,146 @@ public final class BotMessageBuilder {
             sb.append("💰 Jami daromad: <b>+").append(MoneyFormatter.format(income)).append("</b>\n");
         }
         sb.append("💸 Jami xarajat: <b>-").append(MoneyFormatter.format(expense)).append("</b>\n");
-        sb.append("🧾 Jami operatsiyalar: <b>").append(list.size()).append(" ta</b>\n");
+        sb.append("🧾 Jami operatsiyalar: <b>").append(opCount).append(" ta</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
-        int idx = 1;
-        for (Transaction tx : list) {
-            String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
-                    ? tx.getCategory().getEmoji() : "📌";
-            String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
-            String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
-            String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+        if (hasProfit) {
+            sb.append("💵 <b>KUNLIK FOYDA:</b>\n");
+            sb.append("  • Foyda: <b>").append(MoneyFormatter.format(profit.getTotalProfit())).append("</b>");
+            if (profit.getCashAmount() != null || profit.getCardAmount() != null) {
+                sb.append(" (💵 Naqd: ").append(MoneyFormatter.format(profit.getCashAmount() != null ? profit.getCashAmount() : BigDecimal.ZERO))
+                  .append(" | 💳 Karta: ").append(MoneyFormatter.format(profit.getCardAmount() != null ? profit.getCardAmount() : BigDecimal.ZERO)).append(")");
+            }
+            sb.append("\n\n");
+        }
 
-            sb.append(idx++).append(". ").append(emoji).append(" <b>").append(escapeHtml(catName)).append("</b>: ");
-            sb.append("<b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>\n");
-            sb.append("   ⏱ <i>").append(timeStr).append("</i>");
-            if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
-                sb.append(" • <i>").append(escapeHtml(tx.getDescription())).append("</i>");
+        int idx = 1;
+        if (hasTxs) {
+            sb.append("📁 <b>XARAJAT VA DAROMADLAR:</b>\n");
+            for (Transaction tx : list) {
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : "📌";
+                String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+                String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
+                String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+
+                sb.append(idx++).append(". ").append(emoji).append(" <b>").append(escapeHtml(catName)).append("</b>: ");
+                sb.append("<b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>\n");
+                sb.append("   ⏱ <i>").append(timeStr).append("</i>");
+                if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
+                    sb.append(" • <i>").append(escapeHtml(tx.getDescription())).append("</i>");
+                }
+                sb.append("\n");
             }
             sb.append("\n");
         }
 
-        sb.append("\n<i>Tahrirlash yoki o‘chirish uchun kerakli operatsiya tugmasini bosing:</i>");
+        if (hasDebts || hasPayments) {
+            sb.append("🤝 <b>QARZ HARAKATLARI:</b>\n");
+            if (hasDebts) {
+                for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                    String timeStr = d.getCreatedAt() != null ? DateTimeUtils.formatTime(d.getCreatedAt(), timezone) : "";
+                    String sign = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "-" : "+";
+                    String title = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "💸 Qarz berildi" : "💰 Qarz olindi";
+                    BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                    sb.append(idx++).append(". ").append(title).append(" (<b>").append(escapeHtml(d.getPersonName())).append("</b>): ");
+                    sb.append("<b>").append(sign).append(MoneyFormatter.format(amt)).append("</b>\n");
+                    if (!timeStr.isBlank()) {
+                        sb.append("   ⏱ <i>").append(timeStr).append("</i> • <i>").append(d.getPaymentMethod() != null ? d.getPaymentMethod() : "Naqd").append("</i>\n");
+                    }
+                }
+            }
+            if (hasPayments) {
+                for (com.hisobchi.bot.debt.entity.DebtPayment p : payments) {
+                    String timeStr = p.getCreatedAt() != null ? DateTimeUtils.formatTime(p.getCreatedAt(), timezone) : "";
+                    boolean isPayment = p.getPaymentType() == com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT;
+                    String sign = isPayment ? "-" : "+";
+                    String title = isPayment ? "💳 Qarz to‘landi" : "💵 Qarz qaytdi";
+                    String person = p.getDebt() != null ? p.getDebt().getPersonName() : "";
+                    sb.append(idx++).append(". ").append(title);
+                    if (!person.isBlank()) {
+                        sb.append(" (<b>").append(escapeHtml(person)).append("</b>)");
+                    }
+                    sb.append(": <b>").append(sign).append(MoneyFormatter.format(p.getAmount())).append("</b>\n");
+                    if (!timeStr.isBlank()) {
+                        sb.append("   ⏱ <i>").append(timeStr).append("</i> • <i>").append(p.getPaymentMethod() != null ? p.getPaymentMethod() : "Naqd").append("</i>\n");
+                    }
+                }
+            }
+            sb.append("\n");
+        }
+
+        sb.append("<i>Tahrirlash yoki ko‘rish uchun kerakli operatsiya tugmasini bosing:</i>");
         return sb.toString();
     }
 
     public static String buildPeriodTransactionsHistory(String title, LocalDate start, LocalDate end, List<Transaction> list, String timezone) {
-        if (list == null || list.isEmpty()) {
+        return buildPeriodTransactionsHistory(title, start, end, list, List.of(), List.of(), List.of(), timezone);
+    }
+
+    public static String buildPeriodTransactionsHistory(
+            String title,
+            LocalDate start,
+            LocalDate end,
+            List<Transaction> list,
+            List<com.hisobchi.bot.debt.entity.Debt> debts,
+            List<com.hisobchi.bot.debt.entity.DebtPayment> payments,
+            List<com.hisobchi.bot.profit.entity.DailyProfit> profits,
+            String timezone) {
+
+        boolean hasTxs = list != null && !list.isEmpty();
+        boolean hasDebts = debts != null && !debts.isEmpty();
+        boolean hasPayments = payments != null && !payments.isEmpty();
+        boolean hasProfits = profits != null && profits.stream().anyMatch(p -> p.getTotalProfit() != null && p.getTotalProfit().compareTo(BigDecimal.ZERO) > 0);
+
+        if (!hasTxs && !hasDebts && !hasPayments && !hasProfits) {
             return "ℹ️ <b>" + title + "</b> (" + DateTimeUtils.formatUzbekDateRange(start, end) + ") bo‘yicha hech qanday operatsiya topilmadi.";
         }
 
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
-        for (Transaction tx : list) {
-            if (tx.getType() == TransactionType.INCOME) {
-                income = income.add(tx.getAmount());
-            } else {
-                expense = expense.add(tx.getAmount());
+        int opCount = 0;
+
+        if (hasProfits) {
+            for (com.hisobchi.bot.profit.entity.DailyProfit p : profits) {
+                if (p.getTotalProfit() != null) {
+                    income = income.add(p.getTotalProfit());
+                    opCount++;
+                }
+            }
+        }
+
+        if (hasTxs) {
+            for (Transaction tx : list) {
+                if (tx.getType() == TransactionType.INCOME) {
+                    income = income.add(tx.getAmount());
+                } else {
+                    expense = expense.add(tx.getAmount());
+                }
+                opCount++;
+            }
+        }
+
+        if (hasDebts) {
+            for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                if (d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT) {
+                    expense = expense.add(amt);
+                } else {
+                    income = income.add(amt);
+                }
+                opCount++;
+            }
+        }
+
+        if (hasPayments) {
+            for (com.hisobchi.bot.debt.entity.DebtPayment p : payments) {
+                if (p.getPaymentType() == com.hisobchi.bot.debt.entity.DebtPaymentType.DEBT_PAYMENT) {
+                    expense = expense.add(p.getAmount());
+                } else {
+                    income = income.add(p.getAmount());
+                }
+                opCount++;
             }
         }
 
@@ -328,37 +481,55 @@ public final class BotMessageBuilder {
             sb.append("💰 Jami daromad: <b>+").append(MoneyFormatter.format(income)).append("</b>\n");
         }
         sb.append("💸 Jami xarajat: <b>-").append(MoneyFormatter.format(expense)).append("</b>\n");
-        sb.append("🧾 Jami operatsiyalar: <b>").append(list.size()).append(" ta</b>\n");
+        sb.append("🧾 Jami operatsiyalar: <b>").append(opCount).append(" ta</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
-        LocalDate currentDate = null;
-        int count = 0;
-        for (Transaction tx : list) {
-            if (count >= 25) {
-                sb.append("<i>... va yana ").append(list.size() - count).append(" ta operatsiya</i>\n");
-                break;
-            }
-            if (!tx.getTransactionDate().equals(currentDate)) {
-                currentDate = tx.getTransactionDate();
-                sb.append("📅 <b>").append(DateTimeUtils.formatUzbekDate(currentDate)).append("</b>\n");
-            }
+        if (hasTxs) {
+            LocalDate currentDate = null;
+            int count = 0;
+            for (Transaction tx : list) {
+                if (count >= 20) {
+                    sb.append("<i>... va yana ").append(list.size() - count).append(" ta xarajat operatsiyasi</i>\n");
+                    break;
+                }
+                if (!tx.getTransactionDate().equals(currentDate)) {
+                    currentDate = tx.getTransactionDate();
+                    sb.append("📅 <b>").append(DateTimeUtils.formatUzbekDate(currentDate)).append("</b>\n");
+                }
 
-            String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
-                    ? tx.getCategory().getEmoji() : "📌";
-            String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
-            String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
-            String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : "📌";
+                String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+                String sign = tx.getType() == TransactionType.INCOME ? "+" : "-";
+                String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
 
-            sb.append("  • ").append(timeStr).append(" | ").append(emoji).append(" ").append(escapeHtml(catName))
-              .append(": <b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>");
-            if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
-                sb.append(" (").append(escapeHtml(tx.getDescription())).append(")");
+                sb.append("  • ").append(timeStr).append(" | ").append(emoji).append(" ").append(escapeHtml(catName))
+                  .append(": <b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>");
+                if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
+                    sb.append(" (").append(escapeHtml(tx.getDescription())).append(")");
+                }
+                sb.append("\n");
+                count++;
             }
             sb.append("\n");
-            count++;
         }
 
-        sb.append("\n<i>Tahrirlash yoki o‘chirish uchun kerakli operatsiya tugmasini bosing:</i>");
+        if (hasDebts) {
+            sb.append("🤝 <b>BERILGAN / OLINGAN QARZLAR:</b>\n");
+            int dCount = 0;
+            for (com.hisobchi.bot.debt.entity.Debt d : debts) {
+                if (dCount >= 10) break;
+                String icon = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "💸 Qarz berildi" : "💰 Qarz olindi";
+                String sign = d.getType() == com.hisobchi.bot.debt.entity.DebtType.LENT ? "-" : "+";
+                BigDecimal amt = d.getOriginalAmount() != null ? d.getOriginalAmount() : d.getAmount();
+                sb.append("  • ").append(icon).append(" (<b>").append(escapeHtml(d.getPersonName())).append("</b>): ")
+                  .append("<b>").append(sign).append(MoneyFormatter.format(amt)).append("</b>\n");
+                dCount++;
+            }
+            sb.append("\n");
+        }
+
+        sb.append("<i>Tahrirlash yoki o‘chirish uchun kerakli operatsiya tugmasini bosing:</i>");
         return sb.toString();
     }
 
@@ -397,6 +568,7 @@ public final class BotMessageBuilder {
             sb.append("📅 <b>Qaytarish:</b>\n")
                     .append(draft.getDueDate() != null ? draft.getDueDate().format(dFmt) : "<i>Belgilanmagan</i>").append("\n\n");
             sb.append("💳 <b>To‘lov turi:</b>\n").append(draft.getPaymentMethod() != null ? draft.getPaymentMethod() : "Naqd").append("\n\n");
+            sb.append("<b>Saqlaymizmi?</b>");
         } else {
             sb.append("🤝 <b>QARZ BERISH</b>\n\n");
             sb.append("👤 <b>Kimga:</b>\n").append(escapeHtml(draft.getPersonName())).append("\n\n");
@@ -404,9 +576,9 @@ public final class BotMessageBuilder {
             sb.append("📅 <b>Qaytarish sanasi:</b>\n")
                     .append(draft.getDueDate() != null ? draft.getDueDate().format(dFmt) : "<i>Belgilanmagan</i>").append("\n\n");
             sb.append("💵 <b>To‘lov turi:</b>\n").append(draft.getPaymentMethod() != null ? draft.getPaymentMethod() : "Naqd").append("\n\n");
+            sb.append("🤔 <b>Bu qarz qaysi foydadan berildi? Bugungimi?</b>");
         }
 
-        sb.append("<b>Saqlaymizmi?</b>");
         return sb.toString();
     }
 

@@ -40,6 +40,7 @@ public class VoiceMessageHandler {
     private final com.hisobchi.bot.telegram.handler.DebtNlpHandler debtNlpHandler;
     @org.springframework.context.annotation.Lazy
     private final TextMessageHandler textMessageHandler;
+    private final com.hisobchi.bot.todo.handler.TodoMessageHandler todoMessageHandler;
 
     public void handle(User user, Message message) {
         Long chatId = message.getChat().getId();
@@ -85,6 +86,11 @@ public class VoiceMessageHandler {
 
         // Quick natural command for profit adjustments or profit expenses via voice
         if (textMessageHandler.handleQuickProfitCommand(user, chatId, transcribedText)) {
+            return;
+        }
+
+        // Check if voice message is a task/reminder
+        if (todoMessageHandler.handleCommandOrButton(user, chatId, transcribedText)) {
             return;
         }
 

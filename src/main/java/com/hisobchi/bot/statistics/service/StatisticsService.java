@@ -25,6 +25,11 @@ import java.time.temporal.TemporalAdjusters;
 import com.hisobchi.bot.common.util.DateTimeUtils;
 import com.hisobchi.bot.profit.entity.DailyProfit;
 import com.hisobchi.bot.profit.service.DailyProfitService;
+import com.hisobchi.bot.debt.entity.DebtPaymentType;
+import com.hisobchi.bot.debt.entity.DebtType;
+import com.hisobchi.bot.debt.repository.DebtPaymentRepository;
+import com.hisobchi.bot.debt.repository.DebtRepository;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +43,25 @@ public class StatisticsService {
     private final TransactionRepository transactionRepository;
     private final DailySummaryService dailySummaryService;
     private final DailyProfitService dailyProfitService;
+    private final DebtRepository debtRepository;
+    private final DebtPaymentRepository debtPaymentRepository;
 
     @Transactional(readOnly = true)
     public DailyStatisticsDto getDailyStatistics(User user, LocalDate date) {
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.EXPENSE, date);
         if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        BigDecimal lentDebt = debtRepository != null
+                ? debtRepository.sumCreatedAmountByUserIdAndTypeAndDate(user.getId(), DebtType.LENT, date)
+                : BigDecimal.ZERO;
+        if (lentDebt == null) lentDebt = BigDecimal.ZERO;
+
+        BigDecimal paidDebt = debtPaymentRepository != null
+                ? debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDate(user.getId(), DebtPaymentType.DEBT_PAYMENT, date)
+                : BigDecimal.ZERO;
+        if (paidDebt == null) paidDebt = BigDecimal.ZERO;
+
+        BigDecimal totalExpenseWithDebts = totalExpense.add(lentDebt).add(paidDebt);
 
         Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), date);
         BigDecimal enteredProfit = BigDecimal.ZERO;
@@ -54,15 +73,32 @@ public class StatisticsService {
         }
 
         // FORMULA: totalEarned = profit + expenses, netProfit = enteredProfit (real profit)
-        BigDecimal totalEarned = enteredProfit.add(totalExpense);
+        BigDecimal totalEarned = enteredProfit.add(totalExpenseWithDebts);
         BigDecimal netProfit = enteredProfit;
 
-        long count = transactionRepository.countByUserIdAndDate(user.getId(), date);
-        List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, date);
+        long lentCount = (lentDebt.compareTo(BigDecimal.ZERO) > 0 && debtRepository != null)
+                ? debtRepository.countCreatedByUserIdAndTypeAndDate(user.getId(), DebtType.LENT, date)
+                : 0L;
+        long paidDebtCount = (paidDebt.compareTo(BigDecimal.ZERO) > 0 && debtPaymentRepository != null)
+                ? debtPaymentRepository.countByUserIdAndPaymentTypeAndPaymentDate(user.getId(), DebtPaymentType.DEBT_PAYMENT, date)
+                : 0L;
+        long count = transactionRepository.countByUserIdAndDate(user.getId(), date) + lentCount + paidDebtCount;
+
+        List<CategoryExpenseDto> categories = new ArrayList<>(
+                transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, date)
+        );
+        if (lentDebt.compareTo(BigDecimal.ZERO) > 0) {
+            categories.add(new CategoryExpenseDto(null, "Berilgan qarz", "🤝", lentDebt, Math.max(1, lentCount)));
+        }
+        if (paidDebt.compareTo(BigDecimal.ZERO) > 0) {
+            categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidDebtCount)));
+        }
+        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+
         boolean isClosed = dailySummaryService.isDayClosed(user.getId(), date);
         boolean isOffDay = dailyProfitService.isOffDay(user.getId(), date);
 
-        return new DailyStatisticsDto(date, totalEarned, totalExpense, netProfit, count, categories, isClosed, isOffDay);
+        return new DailyStatisticsDto(date, totalEarned, totalExpenseWithDebts, netProfit, count, categories, isClosed, isOffDay);
     }
 
     @Transactional(readOnly = true)
@@ -73,6 +109,18 @@ public class StatisticsService {
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
                 user.getId(), TransactionType.EXPENSE, startDate, endDate);
         if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        BigDecimal lentDebt = debtRepository != null
+                ? debtRepository.sumCreatedAmountByUserIdAndTypeAndDateBetween(user.getId(), DebtType.LENT, startDate, endDate)
+                : BigDecimal.ZERO;
+        if (lentDebt == null) lentDebt = BigDecimal.ZERO;
+
+        BigDecimal paidDebt = debtPaymentRepository != null
+                ? debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDateBetween(user.getId(), DebtPaymentType.DEBT_PAYMENT, startDate, endDate)
+                : BigDecimal.ZERO;
+        if (paidDebt == null) paidDebt = BigDecimal.ZERO;
+
+        BigDecimal totalExpenseWithDebts = totalExpense.add(lentDebt).add(paidDebt);
 
         List<DailyProfit> profitList = dailyProfitService.getProfitsBetween(user.getId(), startDate, endDate);
         Map<LocalDate, DailyProfit> profitMap = new HashMap<>();
@@ -96,15 +144,32 @@ public class StatisticsService {
             }
         }
 
-        BigDecimal totalEarned = totalProfit.add(totalExpense);
+        BigDecimal totalEarned = totalProfit.add(totalExpenseWithDebts);
         BigDecimal netProfit = totalProfit;
-        long count = transactionRepository.countByUserIdAndDateBetween(user.getId(), startDate, endDate);
-        List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesBetween(
-                user.getId(), TransactionType.EXPENSE, startDate, endDate);
+
+        long lentCount = (lentDebt.compareTo(BigDecimal.ZERO) > 0 && debtRepository != null)
+                ? debtRepository.countCreatedByUserIdAndTypeAndDateBetween(user.getId(), DebtType.LENT, startDate, endDate)
+                : 0L;
+        long paidDebtCount = (paidDebt.compareTo(BigDecimal.ZERO) > 0 && debtPaymentRepository != null)
+                ? debtPaymentRepository.countByUserIdAndPaymentTypeAndPaymentDateBetween(user.getId(), DebtPaymentType.DEBT_PAYMENT, startDate, endDate)
+                : 0L;
+        long count = transactionRepository.countByUserIdAndDateBetween(user.getId(), startDate, endDate) + lentCount + paidDebtCount;
+
+        List<CategoryExpenseDto> categories = new ArrayList<>(
+                transactionRepository.findCategoryExpensesBetween(
+                        user.getId(), TransactionType.EXPENSE, startDate, endDate)
+        );
+        if (lentDebt.compareTo(BigDecimal.ZERO) > 0) {
+            categories.add(new CategoryExpenseDto(null, "Berilgan qarz", "🤝", lentDebt, Math.max(1, lentCount)));
+        }
+        if (paidDebt.compareTo(BigDecimal.ZERO) > 0) {
+            categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidDebtCount)));
+        }
+        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
         CategoryExpenseDto topCategory = categories.isEmpty() ? null : categories.get(0);
 
-        return new WeeklyStatisticsDto(startDate, endDate, totalEarned, totalExpense, netProfit, count, categories, topCategory);
+        return new WeeklyStatisticsDto(startDate, endDate, totalEarned, totalExpenseWithDebts, netProfit, count, categories, topCategory);
     }
 
     @Transactional(readOnly = true)
@@ -119,6 +184,18 @@ public class StatisticsService {
         BigDecimal totalExpense = transactionRepository.sumAmountByUserIdAndTypeAndDateBetween(
                 user.getId(), TransactionType.EXPENSE, startDate, endDate);
         if (totalExpense == null) totalExpense = BigDecimal.ZERO;
+
+        BigDecimal lentDebt = debtRepository != null
+                ? debtRepository.sumCreatedAmountByUserIdAndTypeAndDateBetween(user.getId(), DebtType.LENT, startDate, endDate)
+                : BigDecimal.ZERO;
+        if (lentDebt == null) lentDebt = BigDecimal.ZERO;
+
+        BigDecimal paidDebt = debtPaymentRepository != null
+                ? debtPaymentRepository.sumAmountByUserIdAndPaymentTypeAndPaymentDateBetween(user.getId(), DebtPaymentType.DEBT_PAYMENT, startDate, endDate)
+                : BigDecimal.ZERO;
+        if (paidDebt == null) paidDebt = BigDecimal.ZERO;
+
+        BigDecimal totalExpenseWithDebts = totalExpense.add(lentDebt).add(paidDebt);
 
         List<DailyProfit> profitList = dailyProfitService.getProfitsBetween(user.getId(), startDate, endDate);
         Map<LocalDate, DailyProfit> profitMap = new HashMap<>();
@@ -150,7 +227,7 @@ public class StatisticsService {
             }
         }
 
-        BigDecimal totalEarned = totalProfit.add(totalExpense);
+        BigDecimal totalEarned = totalProfit.add(totalExpenseWithDebts);
         BigDecimal netProfit = totalProfit;
 
         long txActiveDays = transactionRepository.countActiveDaysBetween(user.getId(), startDate, endDate);
@@ -161,16 +238,31 @@ public class StatisticsService {
 
         BigDecimal activeDaysBd = BigDecimal.valueOf(activeDays);
         BigDecimal avgDailyIncome = totalEarned.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
-        BigDecimal avgDailyExpense = totalExpense.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
+        BigDecimal avgDailyExpense = totalExpenseWithDebts.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
         BigDecimal avgDailyNetProfit = netProfit.divide(activeDaysBd, 0, RoundingMode.HALF_UP);
 
-        List<CategoryExpenseDto> categories = transactionRepository.findCategoryExpensesBetween(
-                user.getId(), TransactionType.EXPENSE, startDate, endDate);
+        List<CategoryExpenseDto> categories = new ArrayList<>(
+                transactionRepository.findCategoryExpensesBetween(
+                        user.getId(), TransactionType.EXPENSE, startDate, endDate)
+        );
+        if (lentDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long lentCount = debtRepository != null
+                    ? debtRepository.countCreatedByUserIdAndTypeAndDateBetween(user.getId(), DebtType.LENT, startDate, endDate)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "Berilgan qarz", "🤝", lentDebt, Math.max(1, lentCount)));
+        }
+        if (paidDebt.compareTo(BigDecimal.ZERO) > 0) {
+            long paidCount = debtPaymentRepository != null
+                    ? debtPaymentRepository.countByUserIdAndPaymentTypeAndPaymentDateBetween(user.getId(), DebtPaymentType.DEBT_PAYMENT, startDate, endDate)
+                    : 1L;
+            categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidCount)));
+        }
+        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
         return new MonthlyStatisticsDto(
                 referenceDate,
                 totalEarned,
-                totalExpense,
+                totalExpenseWithDebts,
                 netProfit,
                 cashSum,
                 cardSum,

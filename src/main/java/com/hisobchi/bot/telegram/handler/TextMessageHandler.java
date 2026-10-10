@@ -15,7 +15,10 @@ import com.hisobchi.bot.common.util.UzbekDateParser;
 import com.hisobchi.bot.debt.dto.DebtStatisticsDto;
 import com.hisobchi.bot.debt.entity.Debt;
 import com.hisobchi.bot.debt.entity.DebtDraft;
+import com.hisobchi.bot.debt.entity.DebtPayment;
 import com.hisobchi.bot.debt.entity.DebtType;
+import com.hisobchi.bot.debt.repository.DebtPaymentRepository;
+import com.hisobchi.bot.debt.repository.DebtRepository;
 import com.hisobchi.bot.debt.service.DebtDraftService;
 import com.hisobchi.bot.debt.service.DebtFlowService;
 import com.hisobchi.bot.debt.service.DebtService;
@@ -77,13 +80,15 @@ public class TextMessageHandler {
     private final ReportService reportService;
     private final NotificationSettingsService notificationSettingsService;
     private final TransactionRepository transactionRepository;
+    private final DebtRepository debtRepository;
+    private final DebtPaymentRepository debtPaymentRepository;
     private final ReplyKeyboardFactory replyKeyboardFactory;
     private final InlineKeyboardFactory inlineKeyboardFactory;
     private final com.hisobchi.bot.debt.service.DebtFlowService debtFlowService;
     private final DebtNlpHandler debtNlpHandler;
-    private final com.hisobchi.bot.user.service.BalanceService balanceService;
     private final TransactionService transactionService;
     private final CategoryMatcher categoryMatcher;
+    private final com.hisobchi.bot.todo.handler.TodoMessageHandler todoMessageHandler;
 
     // Temporary multi-step state storage per user
     private final ConcurrentHashMap<Long, BigDecimal> userCashProfits = new ConcurrentHashMap<>();
@@ -96,6 +101,16 @@ public class TextMessageHandler {
     private final ConcurrentHashMap<Long, Long> userEditingTransactionId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, LocalDate> userProfitTargetDates = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, String> userActiveMenu = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Long> userDraftAddingCatId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, Long> userTxAddingCatId = new ConcurrentHashMap<>();
+
+    public void setUserDraftAddingCatId(Long userId, Long draftId) {
+        userDraftAddingCatId.put(userId, draftId);
+    }
+
+    public void setUserTxAddingCatId(Long userId, Long txId) {
+        userTxAddingCatId.put(userId, txId);
+    }
 
     public void setProfitTargetDate(Long userId, LocalDate date) {
         if (date != null) {
@@ -148,6 +163,55 @@ public class TextMessageHandler {
         userDebtTypes.remove(userId);
     }
 
+    public void clearUserTransientState(Long userId) {
+        clearUserDebtCreation(userId);
+        userExtendingDebtId.remove(userId);
+        userEditingTransactionId.remove(userId);
+        userDraftAddingCatId.remove(userId);
+        userTxAddingCatId.remove(userId);
+        userProfitTargetDates.remove(userId);
+        userCashProfits.remove(userId);
+    }
+
+    private boolean isMainMenuOrSubmenuButton(String text) {
+        if (text == null) return false;
+        return switch (text) {
+            case "💸 Xarajat qo‘shish", "💸 Xarajat qo'shish", "Xarajat qo‘shish", "Xarajat qo'shish",
+                 "💰 Daromad qo‘shish", "💰 Daromad qo'shish", "Daromad qo‘shish", "Daromad qo'shish",
+                 "🎙 Ovoz bilan kiritish",
+                 "📊 Bugungi statistika", "📊 Statistika", "Statistika",
+                 "📅 Haftalik statistika",
+                 "🗓 Oylik statistika",
+                 "📜 Tarix", "Tarix",
+                 "📂 Kategoriyalar", "⚙️ Sozlamalar", "Sozlamalar",
+                 "🔐 Kunni yopish", "Kunni yopish",
+                 "💵 Foydani kiritish", "💵 Foyda kiritish", "Foydani kiritish", "Foyda kiritish", "💵 Foyda", "Foyda",
+                 "🤝 Qarzlar", "📋 Qarzlar", "Qarzlar",
+                 "💰 Qarz oldim", "💵 Qarz oldim",
+                 "💸 Qarz berdim", "💰 Qarz berdim",
+                 "💳 Qarz to‘lash", "💳 Qarz to'lash", "Qarz to‘lash", "Qarz to'lash",
+                 "💵 Qarz qaytardi", "Qarz qaytardi",
+                 "📋 Men olgan qarzlar", "Mening qarzlarim",
+                 "📋 Men bergan qarzlar", "Men bergan qarzlar",
+                 "⚠️ Muddati yaqin",
+                 "📋 Faol qarzlar",
+                 "✅ Yopilgan qarzlar",
+                 "📊 Qarz statistikasi",
+                 "📊 Hisobotlar", "Hisobotlar",
+                 "📜 Bugun", "📜 Kecha", "📜 Oxirgi 7 kun", "📜 Shu oy",
+                 "📅 Bugun", "Bugun",
+                 "📅 Kecha", "Kecha",
+                 "📅 Oxirgi 7 kun", "📆 Oxirgi 7 kun", "Oxirgi 7 kun",
+                 "📆 Oxirgi 14 kun", "📅 Oxirgi 14 kun", "Oxirgi 14 kun",
+                 "📆 Oxirgi 21 kun", "📅 Oxirgi 21 kun", "Oxirgi 21 kun",
+                 "🗓 O‘tgan oy", "🗓 O'tgan oy", "📅 O‘tgan oy", "📅 O'tgan oy", "O‘tgan oy", "O'tgan oy",
+                 "🗓 Shu oy", "📅 Shu oy", "Shu oy",
+                 "✅ Vazifalar", "Vazifalar", "📁 Loyihalar", "Loyihalar",
+                 "⬅️ Orqaga", "⬅️ Asosiy menyu", "🏠 Asosiy menyu" -> true;
+            default -> false;
+        };
+    }
+
     public void handle(User user, com.hisobchi.bot.telegram.client.model.TelegramModels.Message message) {
         String text = message.getText();
         if (text == null || text.isBlank()) return;
@@ -158,13 +222,20 @@ public class TextMessageHandler {
         // 1. Check Global Cancel / Navigation commands
         if (isCancelCommand(trimmed)) {
             userService.updateState(user.getTelegramId(), UserState.IDLE);
+            clearUserTransientState(user.getId());
             userActiveMenu.remove(user.getId());
             apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             return;
         }
 
-        // 2. Route based on User State (if in an interactive input flow)
-        if (user.getState() != null && user.getState() != UserState.IDLE) {
+        // 1.1 If user clicked any menu button, break out of any waiting state
+        if (isMainMenuOrSubmenuButton(trimmed)) {
+            if (user.getState() != null && user.getState() != UserState.IDLE) {
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                clearUserTransientState(user.getId());
+            }
+        } else if (user.getState() != null && user.getState() != UserState.IDLE) {
+            // 2. Route based on User State (if in an interactive input flow)
             handleStateInput(user, chatId, trimmed);
             return;
         }
@@ -213,7 +284,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
-            case "📊 Bugungi statistika" -> {
+            case "📊 Bugungi statistika", "📊 Statistika", "Statistika" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
                 String msg = BotMessageBuilder.buildDailyStatisticsMessage(stats);
@@ -234,18 +305,18 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
-            case "📜 Tarix" -> {
+            case "📜 Tarix", "Tarix" -> {
                 setUserActiveMenu(user.getId(), "HISTORY");
                 apiClient.sendMessage(chatId, "📜 <b>Tarix bo‘limi:</b>\nDavrni tanlang:",
                         replyKeyboardFactory.getHistoryMenu(), "HTML");
                 return;
             }
-            case "📂 Kategoriyalar", "⚙️ Sozlamalar" -> {
+            case "📂 Kategoriyalar", "⚙️ Sozlamalar", "Sozlamalar" -> {
                 apiClient.sendMessage(chatId, "⚙️ <b>Sozlamalar va Kategoriyalar:</b>",
                         replyKeyboardFactory.getSettingsMenu(), "HTML");
                 return;
             }
-            case "🔐 Kunni yopish" -> {
+            case "🔐 Kunni yopish", "Kunni yopish" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
 
@@ -270,7 +341,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getCloseDayConfirmationKeyboard(), "HTML");
                 return;
             }
-            case "💵 Foydani kiritish", "Foydani kiritish", "foyda", "bugungi foyda", "kunlik foyda", "kunlik foydani kiritish" -> {
+            case "💵 Foydani kiritish", "💵 Foyda kiritish", "Foydani kiritish", "Foyda kiritish", "💵 Foyda", "Foyda", "foyda", "bugungi foyda", "kunlik foyda", "kunlik foydani kiritish" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 initiateProfitFlow(user, chatId, today);
                 return;
@@ -372,6 +443,28 @@ public class TextMessageHandler {
                 setUserActiveMenu(user.getId(), "REPORTS");
                 apiClient.sendMessage(chatId, "📊 <b>Davriy hisobotlar:</b>\nKerakli davrni tanlang:",
                         replyKeyboardFactory.getReportsMenu(), "HTML");
+                return;
+            }
+            case "📜 Bugun" -> {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                sendDayHistory(chatId, user, today, "Bugungi");
+                return;
+            }
+            case "📜 Kecha" -> {
+                LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
+                sendDayHistory(chatId, user, yesterday, "Kechagi");
+                return;
+            }
+            case "📜 Oxirgi 7 kun" -> {
+                LocalDate end = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = end.minusDays(6);
+                sendPeriodHistory(chatId, user, start, end, "Oxirgi 7 kunlik");
+                return;
+            }
+            case "📜 Shu oy" -> {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                LocalDate start = today.withDayOfMonth(1);
+                sendPeriodHistory(chatId, user, start, today, "Shu oylik");
                 return;
             }
             case "📅 Kecha", "Kecha" -> {
@@ -500,11 +593,20 @@ public class TextMessageHandler {
             }
         }
 
+        // 3.5 Check To-Do commands or natural task message
+        if (todoMessageHandler.handleCommandOrButton(user, chatId, trimmed)) {
+            return;
+        }
+
         // 4. Natural Language Text Processing (Debt or Transaction)
         handleNaturalTextMessage(user, chatId, trimmed);
     }
 
     private void handleStateInput(User user, Long chatId, String text) {
+        if (todoMessageHandler.handleState(user, chatId, text)) {
+            return;
+        }
+
         UserState state = user.getState();
 
         switch (state) {
@@ -871,7 +973,7 @@ public class TextMessageHandler {
                 );
                 String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
                 apiClient.sendMessage(chatId, confirmMsg,
-                        inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                        inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                 apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             }
             case WAITING_VOICE_DEBT_DATE -> {
@@ -915,7 +1017,7 @@ public class TextMessageHandler {
                     );
                     String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
                     apiClient.sendMessage(chatId, confirmMsg,
-                            inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                            inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                     userService.updateState(user.getTelegramId(), UserState.IDLE);
                     apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
                     return;
@@ -968,7 +1070,7 @@ public class TextMessageHandler {
 
                 String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(draft);
                 apiClient.sendMessage(chatId, confirmMsg,
-                        inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId()), "HTML");
+                        inlineKeyboardFactory.getDebtConfirmationKeyboard(draft.getId(), draft.getType()), "HTML");
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
                 apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
             }
@@ -1010,7 +1112,7 @@ public class TextMessageHandler {
                         d.setAmount(amountOpt.get());
                         String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(d);
                         apiClient.sendMessage(chatId, confirmMsg,
-                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId()), "HTML");
+                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId(), d.getType()), "HTML");
                     });
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
@@ -1022,7 +1124,7 @@ public class TextMessageHandler {
                         d.setPersonName(text.trim());
                         String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(d);
                         apiClient.sendMessage(chatId, confirmMsg,
-                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId()), "HTML");
+                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId(), d.getType()), "HTML");
                     });
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
@@ -1036,7 +1138,7 @@ public class TextMessageHandler {
                         d.setDueDate(dDate);
                         String confirmMsg = BotMessageBuilder.buildDebtDraftConfirmationMessage(d);
                         apiClient.sendMessage(chatId, confirmMsg,
-                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId()), "HTML");
+                                inlineKeyboardFactory.getDebtConfirmationKeyboard(d.getId(), d.getType()), "HTML");
                     });
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
@@ -1056,9 +1158,24 @@ public class TextMessageHandler {
                 userService.updateState(user.getTelegramId(), UserState.WAITING_EXPENSE_CATEGORY);
                 List<Category> categories = categoryService.getCategories(user.getId(), TransactionType.EXPENSE);
 
-                String prompt = "💵 Summa: <b>" + MoneyFormatter.format(amount) + "</b>\n\n📂 <b>Kategoriyani tanlang:</b>";
+                String prompt = "💵 Summa: <b>" + MoneyFormatter.format(amount) + "</b>\n\n📂 <b>Kategoriyani tanlang yoki yangi nom yozing:</b>";
                 apiClient.sendMessage(chatId, prompt,
                         inlineKeyboardFactory.getCategorySelectionKeyboard(draft.getId(), categories), "HTML");
+            }
+            case WAITING_EXPENSE_CATEGORY -> {
+                Optional<TransactionDraft> draftOpt = draftService.getLatestPendingDraft(user.getId());
+                if (draftOpt.isEmpty()) {
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    apiClient.sendMessage(chatId, "⚠️ Xarajat ma'lumotlari topilmadi. Qaytadan kiriting.",
+                            replyKeyboardFactory.getMainMenu(), null);
+                    return;
+                }
+
+                TransactionDraft draft = draftOpt.get();
+                Category cat = categoryService.getOrCreateCategory(user, text, "📌", TransactionType.EXPENSE);
+                draft = draftService.updateDraftCategory(draft.getId(), user.getId(), cat);
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                sendDraftConfirmation(user, chatId, draft);
             }
             case WAITING_INCOME_AMOUNT -> {
                 Optional<BigDecimal> amountOpt = amountParser.parse(text);
@@ -1076,7 +1193,7 @@ public class TextMessageHandler {
                 List<Category> categories = categoryService.getCategories(user.getId(), TransactionType.INCOME);
 
                 String prompt = "💰 Daromad summasi: <b>" + MoneyFormatter.format(amount) + "</b>\n\n" +
-                        "Manbani tanlang yoki pastdan yozing (masalan: <i>\"Konditsioner montajidan\"</i>):";
+                        "Manbani tanlang yoki yangisini yozing (masalan: <i>\"Konditsioner montajidan\"</i>):";
 
                 apiClient.sendMessage(chatId, prompt,
                         inlineKeyboardFactory.getCategorySelectionKeyboard(draft.getId(), categories), "HTML");
@@ -1091,6 +1208,8 @@ public class TextMessageHandler {
 
                 TransactionDraft draft = draftOpt.get();
                 if (!"⏭ O‘tkazib yuborish".equals(text)) {
+                    Category cat = categoryService.getOrCreateCategory(user, text, "📌", TransactionType.INCOME);
+                    draft = draftService.updateDraftCategory(draft.getId(), user.getId(), cat);
                     draft.setDescription(text);
                 }
 
@@ -1118,6 +1237,36 @@ public class TextMessageHandler {
                     sendDraftConfirmation(user, chatId, draft);
                 }
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
+            }
+            case WAITING_CATEGORY_EDIT -> {
+                Long draftId = userDraftAddingCatId.remove(user.getId());
+                Long txId = userTxAddingCatId.remove(user.getId());
+                if (draftId != null) {
+                    TransactionDraft draft = draftService.getDraft(draftId, user.getId());
+                    Category cat = categoryService.getOrCreateCategory(user, text, "📌", draft.getType());
+                    draft = draftService.updateDraftCategory(draftId, user.getId(), cat);
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    sendDraftConfirmation(user, chatId, draft);
+                } else if (txId != null) {
+                    Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
+                    Category cat = categoryService.getOrCreateCategory(user, text, "📌", tx.getType());
+                    TransactionDto updated = transactionService.updateTransaction(txId, user.getId(), null, cat, null, null);
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    String msg = "✅ <b>Yangi kategoriya biriktirildi!</b>\n\n" + BotMessageBuilder.buildTransactionDetail(updated, user.getTimezone());
+                    apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, updated.transactionDate()), "HTML");
+                } else {
+                    Optional<TransactionDraft> draftOpt = draftService.getLatestPendingDraft(user.getId());
+                    if (draftOpt.isPresent()) {
+                        TransactionDraft draft = draftOpt.get();
+                        Category cat = categoryService.getOrCreateCategory(user, text, "📌", draft.getType());
+                        draft = draftService.updateDraftCategory(draft.getId(), user.getId(), cat);
+                        userService.updateState(user.getTelegramId(), UserState.IDLE);
+                        sendDraftConfirmation(user, chatId, draft);
+                    } else {
+                        userService.updateState(user.getTelegramId(), UserState.IDLE);
+                        apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
+                    }
+                }
             }
             case WAITING_TX_EDIT_AMOUNT -> {
                 Optional<BigDecimal> amountOpt = amountParser.parse(text);
@@ -1211,7 +1360,11 @@ public class TextMessageHandler {
                 LocalDate yesterday = DateTimeUtils.today(user.getTimezone()).minusDays(1);
                 sendDayHistory(chatId, user, yesterday, "Kechagi");
                 return;
-            } else if (lowerText.contains("bugun") && (lowerText.contains("hisobot") || lowerText.contains("tarix"))) {
+            } else if (lowerText.contains("bugun") && lowerText.contains("tarix")) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                sendDayHistory(chatId, user, today, "Bugungi");
+                return;
+            } else if (lowerText.contains("bugun") && lowerText.contains("hisobot")) {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 ReportData report = reportService.getDailyReportData(user.getId(), today);
                 String msg = reportService.formatDailyReport(report, user.getId());
@@ -1500,16 +1653,32 @@ public class TextMessageHandler {
 
     private void sendDayHistory(Long chatId, User user, LocalDate date, String label) {
         List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), date);
-        String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(date, list, user.getTimezone());
-        var markup = inlineKeyboardFactory.getDailyOperationsKeyboard(list, date);
+        List<Debt> debts = debtRepository != null
+                ? debtRepository.findAllCreatedByUserIdAndDate(user.getId(), date)
+                : List.of();
+        List<DebtPayment> payments = debtPaymentRepository != null
+                ? debtPaymentRepository.findByUserIdAndPaymentDateOrderByCreatedAtAsc(user.getId(), date)
+                : List.of();
+        DailyProfit profit = dailyProfitService.getProfit(user.getId(), date).orElse(null);
+
+        String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(date, list, debts, payments, profit, user.getTimezone());
+        var markup = inlineKeyboardFactory.getDailyOperationsKeyboard(list, debts, date);
         apiClient.sendMessage(chatId, msg, markup, "HTML");
     }
 
     private void sendPeriodHistory(Long chatId, User user, LocalDate start, LocalDate end, String title) {
         List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
                 user.getId(), start, end);
-        String msg = BotMessageBuilder.buildPeriodTransactionsHistory(title, start, end, list, user.getTimezone());
-        var markup = inlineKeyboardFactory.getTransactionsListKeyboard(list, 15);
+        List<Debt> debts = debtRepository != null
+                ? debtRepository.findAllCreatedByUserIdAndDateBetween(user.getId(), start, end)
+                : List.of();
+        List<DebtPayment> payments = debtPaymentRepository != null
+                ? debtPaymentRepository.findByUserIdAndPaymentDateBetweenOrderByCreatedAtDesc(user.getId(), start, end)
+                : List.of();
+        List<DailyProfit> profits = dailyProfitService.getProfitsBetween(user.getId(), start, end);
+
+        String msg = BotMessageBuilder.buildPeriodTransactionsHistory(title, start, end, list, debts, payments, profits, user.getTimezone());
+        var markup = inlineKeyboardFactory.getTransactionsListKeyboard(list, debts, 15);
         apiClient.sendMessage(chatId, msg, markup, "HTML");
     }
 
