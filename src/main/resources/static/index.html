@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hisobchi & To-Do Super Ilova</title>
+  <meta name="description" content="Xarajatlar, daromadlar, kunlik sof foyda, vazifalar va eslatmalar daftari - Telegram Super Ilova">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Super App Wrapper Frame -->
+  <div class="super-app-wrapper">
+
+    <!-- Header -->
+    <header class="super-header">
+      <div class="user-profile-badge">
+        <div class="avatar-wrapper">
+          <div class="avatar-img">💼</div>
+          <div class="online-dot"></div>
+        </div>
+        <div class="user-info">
+          <span class="user-greeting">Hisobchi Super Ilova</span>
+          <div class="user-name">
+            Abdulloh <span class="super-badge">PRO AGENT</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-header-voice" class="icon-btn" title="Ovozli agentni sinash">🎙️</button>
+        <button id="btn-header-notif" class="icon-btn" title="Eslatmalar">
+          🔔
+          <span class="notif-pulse"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Viewport -->
+    <main class="content-viewport">
+
+      <!-- ========================================== -->
+      <!-- TAB 1: DASHBOARD (BOSH SAHIFA)             -->
+      <!-- ========================================== -->
+      <section id="tab-dashboard" class="app-tab-section active">
+
+        <!-- Hero Balance Card -->
+        <div class="hero-balance-card">
+          <div class="balance-card-header">
+            <span class="balance-title">📊 Bugungi Sof Foyda</span>
+            <div id="btn-toggle-workday" class="day-badge" title="Holatni almashtirish">
+              💼 Ish kuni
+            </div>
+          </div>
+          <div id="val-net-profit" class="balance-amount">+185 000 so‘m</div>
+          <div class="balance-subtext">
+            <span>🗓 11-oktabr, Yakshanba</span> • <span>💵 Naqd: 115k | 💳 Karta: 70k</span>
+          </div>
+
+          <!-- 3-Metrics Grid -->
+          <div class="balance-metrics-grid">
+            <div class="metric-pill">
+              <span class="metric-pill-label">💰 Daromad</span>
+              <span id="val-today-income" class="metric-pill-val income">+320 000</span>
+            </div>
+            <div class="metric-pill">
+              <span class="metric-pill-label">💸 Xarajat</span>
+              <span id="val-today-expense" class="metric-pill-val expense">-135 000</span>
+            </div>
+            <div class="metric-pill">
+              <span class="metric-pill-label">🤝 Qarz balansi</span>
+              <span id="val-debt-balance" class="metric-pill-val debt">-450 000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Action Buttons -->
+        <div class="quick-actions-bar">
+          <div id="quick-add-expense" class="action-tile">
+            <div class="action-tile-icon expense">💸</div>
+            <span class="action-tile-label">Xarajat</span>
+          </div>
+          <div id="quick-add-income" class="action-tile">
+            <div class="action-tile-icon income">💰</div>
+            <span class="action-tile-label">Daromad</span>
+          </div>
+          <div id="quick-add-task" class="action-tile">
+            <div class="action-tile-icon todo">✅</div>
+            <span class="action-tile-label">Vazifa</span>
+          </div>
+          <div id="quick-add-debt" class="action-tile">
+            <div class="action-tile-icon debt">🤝</div>
+            <span class="action-tile-label">Qarz</span>
+          </div>
+        </div>
+
+        <!-- Today's Upcoming Tasks & Planned Payments Widget -->
+        <div class="card-stack">
+          <div class="section-header">
+            <h3 class="section-title">⏰ Bugungi Rejalar va To‘lovlar</h3>
+            <span id="link-view-all-tasks" class="section-link">Barchasi →</span>
+          </div>
+
+          <div id="dashboard-tasks-preview" class="card-stack">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Recent Transactions Stack -->
+        <div class="card-stack">
+          <div class="section-header">
+            <h3 class="section-title">📜 Oxirgi Amallar</h3>
+            <span id="link-view-all-tx" class="section-link">Moliya →</span>
+          </div>
+
+          <div id="dashboard-tx-preview" class="card-stack">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 2: TO-DO AGENT (VAZIFALAR VA REJALAR)  -->
+      <!-- ========================================== -->
+      <section id="tab-todo" class="app-tab-section" style="display: none;">
+
+        <!-- Smart NLP Agent Bar -->
+        <div class="smart-nlp-bar">
+          <span>🧠</span>
+          <input id="input-smart-todo" class="smart-nlp-input" type="text" placeholder="Tabiiy tilda yozing: 'soat 12-da miting bor'...">
+          <button id="btn-smart-todo-submit" class="smart-nlp-btn" title="Vazifa qo‘shish">➕</button>
+        </div>
+
+        <!-- Quick Filter Chips -->
+        <div class="filter-chips-row">
+          <button class="chip-btn active" data-filter="all">Barchasi (5)</button>
+          <button class="chip-btn" data-filter="today">Bugun (3)</button>
+          <button class="chip-btn" data-filter="week">Yaqin 7 kun (4)</button>
+          <button class="chip-btn" data-filter="overdue">Kechikkan (1)</button>
+          <button class="chip-btn" data-filter="nodate">Sanasiz (1)</button>
+          <button class="chip-btn" data-filter="completed">Bajarilgan</button>
+        </div>
+
+        <!-- Tasks List Stack -->
+        <div id="todo-tasks-container" class="card-stack">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Projects & Subtasks Section -->
+        <div class="card-stack" style="margin-top: 10px;">
+          <div class="section-header">
+            <h3 class="section-title">📁 Loyihalar va Kichik Qadamlar</h3>
+            <button id="btn-create-project" class="small-action-btn">+ Loyiha</button>
+          </div>
+
+          <div id="projects-container" class="card-stack">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: FINANCE (XARAJAT & DAROMAD)        -->
+      <!-- ========================================== -->
+      <section id="tab-finance" class="app-tab-section" style="display: none;">
+
+        <!-- Daily Profit Edit Box -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <span class="balance-title">💵 Kunlik Foyda Taqqoslami</span>
+            <button id="btn-edit-profit" class="small-action-btn">✏️ Foydani kiritish</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div>
+              <div style="font-size: 12px; color: var(--text-muted);">Jami kiritilgan sof foyda</div>
+              <div style="font-size: 24px; font-weight: 800; color: var(--emerald); font-family: 'Outfit';">185 000 so‘m</div>
+            </div>
+            <div style="text-align: right; font-size: 12px; color: var(--text-dim);">
+              Naqd: <b>115 000</b><br>Karta: <b>70 000</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="section-header">
+          <h3 class="section-title">📂 Xarajat Kategoriyalari</h3>
+          <button id="btn-add-category" class="small-action-btn">+ Yangi</button>
+        </div>
+
+        <div id="categories-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Full Transactions List -->
+        <div class="section-header" style="margin-top: 10px;">
+          <h3 class="section-title">📜 Barcha Tranzaksiyalar</h3>
+          <span style="font-size: 12px; color: var(--text-muted);" id="tx-count-badge">8 ta operatsiya</span>
+        </div>
+
+        <div id="finance-tx-list" class="card-stack">
+          <!-- Injected via JS -->
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 4: DEBTS (QARZLAR DAFTARI)             -->
+      <!-- ========================================== -->
+      <section id="tab-debts" class="app-tab-section" style="display: none;">
+
+        <div class="filter-chips-row">
+          <button class="chip-btn active" data-debt-type="all">Barchasi (3)</button>
+          <button class="chip-btn" data-debt-type="borrowed">Men olgan qarzlar (2)</button>
+          <button class="chip-btn" data-debt-type="lent">Men bergan qarzlar (1)</button>
+        </div>
+
+        <div class="hero-balance-card" style="padding: 18px;">
+          <div style="display: flex; justify-content: space-between;">
+            <div>
+              <span style="font-size: 11px; color: var(--text-muted);">Men to‘lashim kerak:</span>
+              <div style="font-size: 20px; font-weight: 800; color: var(--rose); font-family: 'Outfit';">1 250 000 so‘m</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 11px; color: var(--text-muted);">Menga qaytarishadi:</span>
+              <div style="font-size: 20px; font-weight: 800; color: var(--emerald); font-family: 'Outfit';">800 000 so‘m</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="debts-container" class="card-stack">
+          <!-- Injected via JS -->
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 5: ANALYTICS (STATISTIKA & HISOBOT)     -->
+      <!-- ========================================== -->
+      <section id="tab-analytics" class="app-tab-section" style="display: none;">
+
+        <!-- 7-Days Cashflow Trend Chart Card -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="section-title">📈 7 Kunlik Daromad & Xarajat</h3>
+            <span style="font-size: 11px; color: var(--text-muted);">Oxirgi 7 kun</span>
+          </div>
+
+          <div id="weekly-chart" class="chart-bars-container">
+            <!-- Bars injected via JS -->
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 20px; font-size: 11px; color: var(--text-muted);">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; background: var(--emerald); border-radius: 2px;"></span> Daromad
+            </span>
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <span style="width: 10px; height: 10px; background: var(--rose); border-radius: 2px;"></span> Xarajat
+            </span>
+          </div>
+        </div>
+
+        <!-- Planned vs Actual Expenses -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 class="section-title">⚖️ Reja vs Haqiqiy Xarajat</h3>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <span style="color: var(--amber);">Rejalashtirilgan to‘lovlar (Bu oy)</span>
+                <b>2 150 000 so‘m</b>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: 65%; background: var(--amber-gradient);"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <span style="color: var(--rose);">Haqiqiy amalga oshirilgan</span>
+                <b>1 400 000 so‘m</b>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width: 65%; background: var(--rose-gradient);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- BOTTOM NAVIGATION BAR                      -->
+    <!-- ========================================== -->
+    <nav class="super-bottom-nav">
+      <button id="nav-btn-dashboard" class="nav-tab-btn active" data-target="tab-dashboard">
+        <span class="nav-tab-icon">🏠</span>
+        <span>Asosiy</span>
+      </button>
+
+      <button id="nav-btn-todo" class="nav-tab-btn" data-target="tab-todo">
+        <span class="nav-tab-icon">✅</span>
+        <span>Vazifalar</span>
+      </button>
+
+      <!-- Center Voice / Quick Action Button -->
+      <button id="btn-floating-voice" class="floating-mic-btn" title="Ovozli Agent">
+        🎙️
+      </button>
+
+      <button id="nav-btn-finance" class="nav-tab-btn" data-target="tab-finance">
+        <span class="nav-tab-icon">💰</span>
+        <span>Moliya</span>
+      </button>
+
+      <button id="nav-btn-debts" class="nav-tab-btn" data-target="tab-debts">
+        <span class="nav-tab-icon">🤝</span>
+        <span>Qarzlar</span>
+      </button>
+
+      <button id="nav-btn-analytics" class="nav-tab-btn" data-target="tab-analytics">
+        <span class="nav-tab-icon">📊</span>
+        <span>Tahlil</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: TWO-STEP EXPENSE RECORD CONFIRM     -->
+  <!-- ========================================== -->
+  <div id="modal-expense-confirm" class="modal-overlay">
+    <div class="bottom-sheet">
+      <div class="sheet-drag-handle"></div>
+      <h3 class="sheet-title">💰 Xarajatga yozilsinmi?</h3>
+      <p id="modal-expense-confirm-desc" class="sheet-desc">
+        "Internet uchun to‘lov" vazifasi bajarildi. <b>150 000 so‘mni</b> haqiqiy Internet xarajati sifatida yozaymi?
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+        <button id="btn-modal-write-expense" class="btn-primary">
+          ✅ Ha, xarajatga yozish (150 000 so‘m)
+        </button>
+        <button id="btn-modal-edit-expense-amount" class="btn-secondary">
+          ✏️ Sarflangan summani o‘zgartirish
+        </button>
+        <button id="btn-modal-close-task-only" class="btn-secondary" style="border-color: transparent; opacity: 0.8;">
+          ✔️ Faqat vazifani yopish (pul yozilmasin)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: VOICE SIMULATOR                     -->
+  <!-- ========================================== -->
+  <div id="modal-voice" class="modal-overlay">
+    <div class="bottom-sheet">
+      <div class="sheet-drag-handle"></div>
+      <h3 class="sheet-title">🎙️ AI Ovozli Agent Simulator</h3>
+      <p class="sheet-desc">O‘zbek tilida tabiiy ovozli xabarni tanlang yoki o‘zingiz yozing:</p>
+
+      <div class="voice-wave-container">
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="chip-btn voice-preset-btn" data-text="soat 12-da miting bor" style="text-align: left; padding: 10px 14px;">
+          💬 "soat 12-da miting bor" (Vazifa, soat 12:00, summasiz)
+        </button>
+        <button class="chip-btn voice-preset-btn" data-text="Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere" style="text-align: left; padding: 10px 14px;">
+          💬 "Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere" (Vazifa, 09:00, summasiz)
+        </button>
+        <button class="chip-btn voice-preset-btn" data-text="Ertaga 18:00 da internetga 150 ming to‘lashni eslat" style="text-align: left; padding: 10px 14px;">
+          💬 "Ertaga 18:00 da internetga 150 ming to‘lashni eslat" (To‘lov vazifasi, 150k)
+        </button>
+        <button class="chip-btn voice-preset-btn" data-text="15 ming obedga" style="text-align: left; padding: 10px 14px;">
+          💬 "15 ming obedga" (Xarajat, 15 000 so‘m)
+        </button>
+      </div>
+
+      <button id="btn-close-voice-modal" class="btn-secondary" style="margin-top: 10px;">
+        Yopish
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ADD TRANSACTION (XARAJAT/DAROMAD)   -->
+  <!-- ========================================== -->
+  <div id="modal-transaction" class="modal-overlay">
+    <div class="bottom-sheet">
+      <div class="sheet-drag-handle"></div>
+      <h3 id="modal-tx-title" class="sheet-title">💸 Yangi Xarajat</h3>
+
+      <div class="form-group">
+        <label class="form-label" for="input-tx-amount">Summa (so‘m)</label>
+        <input id="input-tx-amount" class="form-input" type="number" placeholder="Masalan: 45000">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="select-tx-category">Kategoriya</label>
+        <select id="select-tx-category" class="form-input">
+          <option value="Tushlik">🍔 Oziq-ovqat / Tushlik</option>
+          <option value="Transport">🚕 Transport / Benzin</option>
+          <option value="Internet">🌐 Internet / Aloqa</option>
+          <option value="Bozorlik">🛒 Bozorlik / Xarid</option>
+          <option value="Kommunal">💡 Kommunal to‘lovlar</option>
+          <option value="Kiyim">👕 Kiyim-kechak</option>
+          <option value="Boshqa">📌 Boshqa xarajat</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="input-tx-desc">Izoh (ixtiyoriy)</label>
+        <input id="input-tx-desc" class="form-input" type="text" placeholder="Masalan: Konditsioner ustasi">
+      </div>
+
+      <button id="btn-save-transaction" class="btn-primary" style="margin-top: 10px;">
+        💾 Saqlash
+      </button>
+      <button id="btn-cancel-transaction" class="btn-secondary">
+        Bekor qilish
+      </button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
