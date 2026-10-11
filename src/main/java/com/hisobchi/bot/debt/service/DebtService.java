@@ -36,6 +36,17 @@ public class DebtService {
     public static final List<DebtStatus> ACTIVE_STATUSES = List.of(DebtStatus.ACTIVE, DebtStatus.OVERDUE);
     public static final List<DebtStatus> CLOSED_STATUSES = List.of(DebtStatus.PAID, DebtStatus.RECEIVED);
 
+    public static Map<String, List<Debt>> groupDebtsByPerson(List<Debt> debts) {
+        Map<String, List<Debt>> map = new LinkedHashMap<>();
+        if (debts == null) return map;
+        for (Debt d : debts) {
+            if (d == null || d.getPersonName() == null) continue;
+            String key = d.getPersonName().trim().toLowerCase();
+            map.computeIfAbsent(key, k -> new ArrayList<>()).add(d);
+        }
+        return map;
+    }
+
     @Transactional
     public Debt saveFromDraft(DebtDraft draft) {
         BigDecimal amt = draft.getAmount() != null ? draft.getAmount() : BigDecimal.ZERO;

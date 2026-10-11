@@ -249,4 +249,71 @@ class DebtModuleComprehensiveTest {
                 debtService.makePartialPayment(60L, 1L, new BigDecimal("600000"), "Naqd", TransactionSource.MANUAL)
         );
     }
+
+    @Test
+    @DisplayName("Test 10: groupDebtsByPerson groups debts case-insensitively")
+    void testGroupDebtsByPerson() {
+        Debt d1 = Debt.builder().id(1L).personName("Rustam aka").remainingAmount(new BigDecimal("2500000")).build();
+        Debt d2 = Debt.builder().id(2L).personName("Dan").remainingAmount(new BigDecimal("1401000")).build();
+        Debt d3 = Debt.builder().id(3L).personName("Rustam Aka").remainingAmount(new BigDecimal("270000")).build();
+
+        var grouped = DebtService.groupDebtsByPerson(List.of(d1, d2, d3));
+
+        assertEquals(2, grouped.size());
+        assertTrue(grouped.containsKey("rustam aka"));
+        assertTrue(grouped.containsKey("dan"));
+        assertEquals(2, grouped.get("rustam aka").size());
+        assertEquals(1, grouped.get("dan").size());
+    }
+
+    @Test
+    @DisplayName("Test 11: buildActiveDebtsList formats grouped debts with taken amounts and dates")
+    void testBuildActiveDebtsList_Grouped() {
+        LocalDate dDate1 = LocalDate.of(2026, 11, 1);
+        LocalDate sDate1 = LocalDate.of(2026, 10, 1);
+        LocalDate sDate2 = LocalDate.of(2026, 10, 11);
+
+        Debt d1 = Debt.builder()
+                .id(1L)
+                .personName("Rustam aka")
+                .remainingAmount(new BigDecimal("2500000"))
+                .startDate(sDate1)
+                .dueDate(dDate1)
+                .type(DebtType.BORROWED)
+                .build();
+        Debt d2 = Debt.builder()
+                .id(7L)
+                .personName("Dan")
+                .remainingAmount(new BigDecimal("1401000"))
+                .startDate(sDate2)
+                .type(DebtType.BORROWED)
+                .build();
+        Debt d3 = Debt.builder()
+                .id(3L)
+                .personName("Rustam Aka")
+                .remainingAmount(new BigDecimal("270000"))
+                .startDate(sDate2)
+                .type(DebtType.BORROWED)
+                .build();
+
+        String msg = com.hisobchi.bot.telegram.handler.BotMessageBuilder.buildActiveDebtsList(List.of(d1, d2, d3), DebtType.BORROWED);
+
+        // Rustam aka must appear once as header with 2 ta qarz and sum
+        assertTrue(msg.contains("Rustam aka"));
+        assertTrue(msg.contains("2 ta qarz"));
+        assertTrue(msg.contains("2 770 000")); // 2 500 000 + 270 000
+        assertTrue(msg.contains("1-qarz"));
+        assertTrue(msg.contains("2-qarz"));
+        assertTrue(msg.contains("/debt_view_1"));
+        assertTrue(msg.contains("/debt_view_3"));
+        assertTrue(msg.contains("01.10.2026"));
+        assertTrue(msg.contains("11.10.2026"));
+
+        // Dan must appear as single debt
+        assertTrue(msg.contains("Dan"));
+        assertTrue(msg.contains("/debt_view_7"));
+
+        // Must not contain erroneous "(qarzsiz)"
+        assertFalse(msg.contains("(qarzsiz)"));
+    }
 }

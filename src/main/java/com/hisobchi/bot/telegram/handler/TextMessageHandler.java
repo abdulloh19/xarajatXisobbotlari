@@ -386,7 +386,7 @@ public class TextMessageHandler {
                     apiClient.sendMessage(chatId, "✅ Sizda to‘lanishi kerak bo‘lgan qarzlar yo‘q.", replyKeyboardFactory.getDebtsMenu(), null);
                     return;
                 }
-                var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                var grouped = DebtService.groupDebtsByPerson(borrowed);
                 apiClient.sendMessage(chatId, "Kimga qarz to‘lamoqchisiz?",
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
                 return;
@@ -397,7 +397,7 @@ public class TextMessageHandler {
                     apiClient.sendMessage(chatId, "✅ Siz bergan faol qarzlar mavjud emas.", replyKeyboardFactory.getDebtsMenu(), null);
                     return;
                 }
-                var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                var grouped = DebtService.groupDebtsByPerson(lent);
                 apiClient.sendMessage(chatId, "Kim qarz qaytardi?",
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
                 return;

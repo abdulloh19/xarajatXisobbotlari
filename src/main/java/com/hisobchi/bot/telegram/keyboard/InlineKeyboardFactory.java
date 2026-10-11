@@ -503,15 +503,17 @@ public class InlineKeyboardFactory {
     public InlineKeyboardMarkup getDebtGroupedSelectionKeyboard(Map<String, List<Debt>> grouped, String prefix) {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         for (Map.Entry<String, List<Debt>> entry : grouped.entrySet()) {
-            String person = entry.getKey();
             List<Debt> pDebts = entry.getValue();
+            if (pDebts == null || pDebts.isEmpty()) continue;
+            String person = pDebts.get(0).getPersonName() != null ? pDebts.get(0).getPersonName().trim() : entry.getKey();
             if (pDebts.size() == 1) {
                 Debt d = pDebts.get(0);
-                String label = "👤 " + d.getPersonName() + " — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(d.getRemainingAmount()) + " qoldi";
+                String label = "👤 " + person + " — " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(d.getRemainingAmount()) + " qoldi";
                 rows.add(List.of(new InlineKeyboardButton(label, prefix + ":select:" + d.getId())));
             } else {
                 java.math.BigDecimal total = pDebts.stream()
                         .map(Debt::getRemainingAmount)
+                        .filter(java.util.Objects::nonNull)
                         .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
                 String label = "👤 " + person + " — jami " + com.hisobchi.bot.common.formatter.MoneyFormatter.format(total);
                 rows.add(List.of(new InlineKeyboardButton(label, prefix + ":person:" + person)));

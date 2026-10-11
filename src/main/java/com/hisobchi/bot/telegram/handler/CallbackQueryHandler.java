@@ -443,7 +443,7 @@ public class CallbackQueryHandler {
                 Long debtId = parts.length > 2 ? Long.parseLong(parts[2]) : null;
                 if (debtId == null) {
                     List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
-                    var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                    var grouped = DebtService.groupDebtsByPerson(borrowed);
                     apiClient.editMessageText(chatId, messageId, "Kimga qarz to‘lamoqchisiz?",
                             inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
                     return;
@@ -468,7 +468,7 @@ public class CallbackQueryHandler {
             }
             case "back_persons", "back" -> {
                 List<Debt> borrowed = debtService.getActiveDebts(user.getId(), DebtType.BORROWED);
-                var grouped = borrowed.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                var grouped = DebtService.groupDebtsByPerson(borrowed);
                 apiClient.editMessageText(chatId, messageId, "Kimga qarz to‘lamoqchisiz?",
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_pay"), null);
             }
@@ -670,7 +670,7 @@ public class CallbackQueryHandler {
                 Long debtId = parts.length > 2 ? Long.parseLong(parts[2]) : null;
                 if (debtId == null) {
                     List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
-                    var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                    var grouped = DebtService.groupDebtsByPerson(lent);
                     apiClient.editMessageText(chatId, messageId, "Kim qarz qaytardi?",
                             inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
                     return;
@@ -695,7 +695,7 @@ public class CallbackQueryHandler {
             }
             case "back_persons", "back" -> {
                 List<Debt> lent = debtService.getActiveDebts(user.getId(), DebtType.LENT);
-                var grouped = lent.stream().collect(java.util.stream.Collectors.groupingBy(Debt::getPersonName));
+                var grouped = DebtService.groupDebtsByPerson(lent);
                 apiClient.editMessageText(chatId, messageId, "Kim qarz qaytardi?",
                         inlineKeyboardFactory.getDebtGroupedSelectionKeyboard(grouped, "debt_ret"), null);
             }
