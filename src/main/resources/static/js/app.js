@@ -308,10 +308,9 @@ function parseNlpInput(rawText) {
     cleanTitle = cleanTitle.replace(/bugun/gi, '');
   }
 
-  // 2. Check time pattern e.g. "soat 12-da", "soat 9 da", "soat 18:00 da", "14:30 da"
-  const hourPattern = /(?:soat\s*)?(\d{1,2})(?:[:.](\d{2}))?\s*(?:-?da|-gacha|\s*da)?/i;
+  // 2. Check time pattern e.g. "soat 12-da", "soati 7da", "soat 9 da", "soat 18:00 da", "14:30 da"
   const timeExplicitPattern = /\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/;
-  const soatWordPattern = /\bsoat\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:-?da|-gacha)?\b/gi;
+  const soatWordPattern = /\b(?:soat(?:i|iga|ida)?\s*)?(\d{1,2})(?:[:.](\d{2}))?\s*(?:-?da|-gacha|\s*da)\b/gi;
 
   let timeMatch = null;
   if ((timeMatch = timeExplicitPattern.exec(cleanTitle)) !== null) {
@@ -320,8 +319,15 @@ function parseNlpInput(rawText) {
     dueTime = `${hh}:${mm}`;
     cleanTitle = cleanTitle.replace(timeMatch[0], '');
   } else if ((timeMatch = soatWordPattern.exec(cleanTitle)) !== null) {
-    const hh = timeMatch[1].padStart(2, '0');
+    let rawH = parseInt(timeMatch[1], 10);
     const mm = timeMatch[2] ? timeMatch[2].padStart(2, '0') : '00';
+    const currentH = new Date().getHours();
+    if (rawH === 7 && currentH >= 12) {
+      rawH = 19;
+    } else if (rawH >= 1 && rawH <= 6) {
+      rawH += 12;
+    }
+    const hh = String(rawH).padStart(2, '0');
     dueTime = `${hh}:${mm}`;
     cleanTitle = cleanTitle.replace(timeMatch[0], '');
   }

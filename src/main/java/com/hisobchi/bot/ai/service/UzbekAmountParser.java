@@ -260,8 +260,8 @@ public class UzbekAmountParser {
         if (lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil|soat|daqiqa|minut)\\b.*")) {
             return true;
         }
-        // Time only: e.g. "soat 9 da", "soat 12-da", "soat 9", "9 da", "12-da", "soat 9 ga"
-        if (lower.matches(".*\\b(?:soat\\s*\\d{1,2}|\\d{1,2}[-–\\s]*(?:da|ga|dagi))\\b.*")) {
+        // Time only: e.g. "soat 9 da", "soati 7da", "soat 12-da", "soat 9", "9 da", "12-da", "soat 9 ga"
+        if (lower.matches(".*\\b(?:soat(?:i|iga|ida)?\\s*\\d{1,2}|\\d{1,2}[-–\\s]*(?:da|ga|dagi|gacha))\\b.*")) {
             return true;
         }
         return false;

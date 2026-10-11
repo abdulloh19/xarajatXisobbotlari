@@ -11,6 +11,7 @@ import com.hisobchi.bot.todo.dto.ProjectSummaryDto;
 import com.hisobchi.bot.todo.dto.TodoDailyBriefDto;
 import com.hisobchi.bot.todo.dto.TodoTaskDto;
 import com.hisobchi.bot.todo.entity.TodoProject;
+import com.hisobchi.bot.todo.entity.TodoRecurrenceType;
 import com.hisobchi.bot.todo.entity.TodoTask;
 import com.hisobchi.bot.todo.service.TodoNlpService;
 import com.hisobchi.bot.todo.service.TodoProjectService;
@@ -226,7 +227,8 @@ public class TodoMessageHandler {
         Optional<ParsedTodo> parsedOpt = nlpService.parseSingle(text, zoneId);
         if (parsedOpt.isPresent()) {
             ParsedTodo pt = parsedOpt.get();
-            if (pt.getDueTime() != null || pt.getDueDate() != null || pt.getRecurrenceType() != TodoRecurrenceType.NONE
+            if (pt.hasSpecificTime() || pt.dueTime() != null || pt.dueDate() != null
+                    || pt.recurrenceType() != TodoRecurrenceType.NONE
                     || nlpService.isTaskMessage(text)) {
                 TodoTask task = todoService.createTaskFromParsed(user, pt);
                 TodoTaskDto dto = todoService.getTaskDto(task.getId(), user.getId());

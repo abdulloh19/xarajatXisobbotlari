@@ -175,4 +175,32 @@ class TodoNlpServiceTest {
         assertEquals(LocalTime.of(9, 0), parsed.dueTime());
         assertEquals(new BigDecimal("50000"), parsed.plannedAmount());
     }
+
+    @Test
+    @DisplayName("User exact test: 'Soat 7 da oyin bor' must have time and NO planned amount (not 7 so'm)")
+    void testGameAt7WithoutAmount() {
+        String text = "Soat 7 da oyin bor";
+        assertTrue(nlpService.isTaskMessage(text), "'Soat 7 da oyin bor' should be recognized as a task");
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertNotNull(parsed.dueTime());
+        assertTrue(parsed.dueTime().equals(LocalTime.of(7, 0)) || parsed.dueTime().equals(LocalTime.of(19, 0)));
+        assertNull(parsed.plannedAmount(), "Must not have planned amount of 7 so'm!");
+    }
+
+    @Test
+    @DisplayName("User voice exact test: 'soati 7da o'yin bor' must be recognized and have NO planned amount")
+    void testVoiceGameAt7() {
+        String text = "soati 7da o'yin bor";
+        assertTrue(nlpService.isTaskMessage(text), "'soati 7da o'yin bor' should be recognized as a task");
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertNotNull(parsed.dueTime());
+        assertTrue(parsed.dueTime().equals(LocalTime.of(7, 0)) || parsed.dueTime().equals(LocalTime.of(19, 0)));
+        assertNull(parsed.plannedAmount(), "Must not have planned amount of 7 so'm!");
+    }
 }

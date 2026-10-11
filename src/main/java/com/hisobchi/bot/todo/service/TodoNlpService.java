@@ -51,9 +51,11 @@ public class TodoNlpService {
 
     // Event or activity pattern
     private static final Pattern EVENT_OR_ACTION_PATTERN = Pattern.compile(
-            "\\b(?:miting|majlis|sobranie|собрание|dars|darsim|kurs|trening|mashg['‘`]?ulot|" +
+            "\\b(?:miting|majlis|sobranie|собрание|dars|darsim|kurs|trening|mashg['‘`]?ulot|mashq|trenirovka|" +
+            "o['‘`]?yin|oyin|futbol|match|zal|fitnes|bassen|tennis|yugurish|" +
             "uchrashuv|vstrecha|встреча|intervyu|suhbat|doktor|vrach|shifokor|konsultatsiya|" +
             "telefon|tel|qo['‘`]?ng['‘`]?roq|zvonok|звонок|" +
+            "choyxona|gap|to['‘`]?y|ziyofat|tadbir|marosim|imtihon|test|sessiya|konsert|kino|kinoga|mehmon|" +
             "bor\\b|bo['‘`]?ladi|boladi|boshlanadi|bo['‘`]?lib\\s*o['‘`]?tadi|" +
             "borish|kelish|ketish|uchish|qilish|yozish|o['‘`]?qish|topshirish|ko['‘`]?rishish|" +
             "kere\\b|kerak\\b|kerag\\b)\\b",
@@ -62,7 +64,7 @@ public class TodoNlpService {
 
     // Time or relative date indicators
     private static final Pattern TIME_OR_DATE_PATTERN = Pattern.compile(
-            "\\b(?:soat\\s*\\d{1,2}|\\d{1,2}[:.]\\d{2}|\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi))|" +
+            "\\b(?:soat(?:i|iga|ida)?\\s*\\d{1,2}|\\d{1,2}[:.]\\d{2}|\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi|gacha))|" +
             "bugun|ertaga|indinga|kechqurun|ertalab|saharda|tushda|" +
             "dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba|" +
             "завтра|сегодня|послезавтра)\\b",
@@ -71,13 +73,13 @@ public class TodoNlpService {
 
     // Explicit time pattern: "18:00", "09.30", "15:00 da", "soat 18:00 da", "12:00-da"
     private static final Pattern TIME_EXPLICIT_PATTERN = Pattern.compile(
-            "(?:soat\\s*)?(\\d{1,2})[:.](\\d{2})(?:[-–\\s]*(?:da|ga|dagi))?",
+            "(?:soat(?:i|iga|ida)?\\s*)?(\\d{1,2})[:.](\\d{2})(?:[-–\\s]*(?:da|ga|dagi|gacha))?",
             Pattern.CASE_INSENSITIVE
     );
 
-    // Relative hour pattern: "soat 9 da", "9 da", "soat 12-da", "12-da", "18 da", "ertalab 9 da", "kechki 6 da", "soat 9 ga", "soat 9-da"
+    // Relative hour pattern: "soat 9 da", "soati 7da", "9 da", "soat 12-da", "12-da", "18 da", "ertalab 9 da", "kechki 6 da", "soat 9 ga", "soat 9-da"
     private static final Pattern HOUR_ONLY_PATTERN = Pattern.compile(
-            "(?:(?:ertalab|saharda|kunduzi|tushda|kechki|kechqurun|oqshom)\\s+)?(?:soat\\s*)?(\\d{1,2})(?:[-–\\s]*(?:da|ga|dagi))\\b",
+            "(?:(?:ertalab|saharda|kunduzi|tushda|kechki|kechqurun|oqshom)\\s+)?(?:soat(?:i|iga|ida)?\\s*)?(\\d{1,2})(?:[-–\\s]*(?:da|ga|dagi|gacha))\\b",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -178,10 +180,11 @@ public class TodoNlpService {
         BigDecimal amount = null;
         boolean hasFinancialIntent = FINANCIAL_OR_AMOUNT_PATTERN.matcher(lower).find();
         if (hasFinancialIntent) {
-            // Strip time and date expressions so that "soat 9 da", "18:00", "12-da" are not parsed as amount
+            // Strip time and date expressions so that "soat 9 da", "soati 7da", "18:00", "12-da" are not parsed as amount
             String textForAmount = lower;
-            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat\\s*)?\\d{1,2}[:.]\\d{2}(?:[-–\\s]*(?:da|ga|dagi))?\\b", " ");
-            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat\\s*)?\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi))\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat(?:i|iga|ida)?\\s*)?\\d{1,2}[:.]\\d{2}(?:[-–\\s]*(?:da|ga|dagi|gacha))?\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat(?:i|iga|ida)?\\s*)?\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi|gacha))\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\bsoat(?:i|iga|ida)?\\s*\\d{1,2}\\b", " ");
             textForAmount = textForAmount.replaceAll("(?i)\\bhar\\s*oyning\\s*\\d{1,2}(?:-)?(?:kuni|kunida|sida|chi|chisi)?\\b", " ");
             textForAmount = textForAmount.replaceAll("(?i)\\b\\d{1,2}(?:-)?(?:yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)\\b", " ");
 
@@ -225,9 +228,16 @@ public class TodoNlpService {
                 } else if (matchStr.contains("tushda") || matchStr.contains("kunduzi")) {
                     if (h <= 5) h += 12;
                 } else if (h >= 1 && h <= 6) {
-                    // E.g. "6 da" without descriptor: ambiguous (could be 06:00 or 18:00)
                     isAmbiguous = true;
-                    h += 12; // default to evening 18:00
+                    h += 12; // 1..6 without descriptor default to afternoon 13..18
+                } else if (h == 7) {
+                    LocalTime now = LocalTime.now(zoneId);
+                    if (dueDate == null || dueDate.equals(today)) {
+                        if (now.getHour() >= 12) {
+                            // In afternoon/evening, "7 da" (e.g. "o'yin bor", "uchrashuv") means 19:00 (7 PM)
+                            h = 19;
+                        }
+                    }
                 }
                 if (h >= 0 && h <= 23) {
                     dueTime = LocalTime.of(h, 0);
