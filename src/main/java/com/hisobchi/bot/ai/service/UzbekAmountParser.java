@@ -99,8 +99,8 @@ public class UzbekAmountParser {
 
         String normalized = normalize(text);
 
-        // Guard: if the text is purely a duration or time navigation like "7 kun", "oxirgi 7 kun", ignore
-        if (isDurationOnly(normalized)) {
+        // Guard: if the text is purely a duration or time navigation like "7 kun", "soat 9 da", ignore
+        if (isDurationOrTimeOnly(normalized)) {
             return Optional.empty();
         }
 
@@ -219,6 +219,13 @@ public class UzbekAmountParser {
 
         total += current;
         if (foundNumber && total > 0) {
+            // Standalone small numbers without explicit currency (e.g. 7, 9, 12) are times or dates, not valid money amounts
+            if (total < 1000) {
+                boolean hasCurrency = text.matches(".*\\b(?:so['‘`]?m|som|сом|dollar|\\$|usd|rubl|yevro|evro)\\b.*");
+                if (!hasCurrency) {
+                    return Optional.empty();
+                }
+            }
             return Optional.of(BigDecimal.valueOf(total));
         }
         return Optional.empty();
@@ -241,11 +248,22 @@ public class UzbekAmountParser {
         return s;
     }
 
-    private boolean isDurationOnly(String text) {
+    private boolean isDurationOrTimeOnly(String text) {
         String lower = text.toLowerCase().trim();
-        if (lower.contains("so'm") || lower.contains("som") || lower.contains("ming") || lower.contains("mln") || lower.contains("million")) {
+        if (lower.contains("so'm") || lower.contains("som") || lower.contains("сом") ||
+            lower.contains("ming") || lower.contains("минг") || lower.contains("min") || lower.contains("k") ||
+            lower.contains("mln") || lower.contains("млн") || lower.contains("million") || lower.contains("миллион") ||
+            lower.contains("dollar") || lower.contains("$") || lower.contains("usd")) {
             return false;
         }
-        return lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil|soat|daqiqa|minut)\\b.*");
+        // Duration: e.g. "7 kun", "oxirgi 7 kun", "14 kun"
+        if (lower.matches(".*\\b\\d+\\s*(?:kun|hafta|oy|yil|soat|daqiqa|minut)\\b.*")) {
+            return true;
+        }
+        // Time only: e.g. "soat 9 da", "soat 12-da", "soat 9", "9 da", "12-da", "soat 9 ga"
+        if (lower.matches(".*\\b(?:soat\\s*\\d{1,2}|\\d{1,2}[-–\\s]*(?:da|ga|dagi))\\b.*")) {
+            return true;
+        }
+        return false;
     }
 }

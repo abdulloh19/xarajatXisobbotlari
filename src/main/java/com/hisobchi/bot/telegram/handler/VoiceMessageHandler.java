@@ -97,6 +97,10 @@ public class VoiceMessageHandler {
         Optional<ParsedTransaction> parsedOpt = result.parsedTransaction();
 
         if (parsedOpt.isEmpty()) {
+            if (todoMessageHandler.handleVoiceTaskFallback(user, chatId, transcribedText)) {
+                return;
+            }
+
             apiClient.sendMessage(chatId,
                     "🎙 Siz aytdingiz:\n<i>\"" + BotMessageBuilder.escapeHtml(transcribedText) +
                     "\"</i>\n\n⚠️ Kechirasiz, bu xabardan summa yoki operatsiya turini aniqlay olmadim. Masalan: <i>\"15 ming obedga\"</i>",

@@ -122,4 +122,57 @@ class TodoNlpServiceTest {
         assertTrue(optCyr.isPresent());
         assertEquals(LocalTime.of(18, 0), optCyr.get().dueTime());
     }
+
+    @Test
+    @DisplayName("Voice task 'soat 12-da miting bor' must be detected with 12:00 and NO planned amount")
+    void testVoiceMeetingTask() {
+        String text = "soat 12-da miting bor";
+        assertTrue(nlpService.isTaskMessage(text));
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertEquals(LocalTime.of(12, 0), parsed.dueTime());
+        assertNull(parsed.plannedAmount(), "Hour 12 must NOT be parsed as 12 so'm planned amount!");
+    }
+
+    @Test
+    @DisplayName("Task 'Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere' must NOT have 9 so'm amount")
+    void testTaskWithHourNoAmount() {
+        String text = "Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere";
+        assertTrue(nlpService.isTaskMessage(text));
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertEquals(LocalTime.of(9, 0), parsed.dueTime());
+        assertEquals(LocalDate.now(zoneId), parsed.dueDate());
+        assertNull(parsed.plannedAmount(), "Hour 9 must NOT be parsed as 9 so'm planned amount!");
+    }
+
+    @Test
+    @DisplayName("Task 'soat 9 ga vazifa belgilash' must have time 09:00 and NO amount")
+    void testTaskSoat9GaWithoutAmount() {
+        String text = "soat 9 ga vazifa belgilash";
+        assertTrue(nlpService.isTaskMessage(text));
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertEquals(LocalTime.of(9, 0), parsed.dueTime());
+        assertNull(parsed.plannedAmount());
+    }
+
+    @Test
+    @DisplayName("Financial task 'soat 9 da ustaga 50 ming berish kere' has both time 09:00 and 50000 amount")
+    void testFinancialTaskWithTimeAndAmount() {
+        String text = "soat 9 da ustaga 50 ming berish kere";
+        assertTrue(nlpService.isTaskMessage(text));
+
+        Optional<ParsedTodo> opt = nlpService.parseSingle(text, zoneId);
+        assertTrue(opt.isPresent());
+        ParsedTodo parsed = opt.get();
+        assertEquals(LocalTime.of(9, 0), parsed.dueTime());
+        assertEquals(new BigDecimal("50000"), parsed.plannedAmount());
+    }
 }

@@ -159,4 +159,25 @@ class UzbekAmountParserTest {
         Optional<BigDecimal> result = parser.parse("14 kun");
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    @DisplayName("Time 'soat 9 da' must NOT be parsed as amount")
+    void testSoat9DaNotAmount() {
+        Optional<BigDecimal> result = parser.parse("soat 9 da");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Time 'soat 12-da' must NOT be parsed as amount")
+    void testSoat12DaNotAmount() {
+        Optional<BigDecimal> result = parser.parse("soat 12-da");
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Sentence 'Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere' must NOT be parsed as amount")
+    void testLessonSentenceNotAmount() {
+        Optional<BigDecimal> result = parser.parse("Bugun ertalab soat 9 da ingiliz tili darsimni qilish kere");
+        assertTrue(result.isEmpty());
+    }
 }

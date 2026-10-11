@@ -220,6 +220,24 @@ public class TodoMessageHandler {
         return false;
     }
 
+    public boolean handleVoiceTaskFallback(User user, Long chatId, String text) {
+        if (text == null || text.isBlank()) return false;
+        ZoneId zoneId = ZoneId.of(user.getTimezone() != null ? user.getTimezone() : "Asia/Tashkent");
+        Optional<ParsedTodo> parsedOpt = nlpService.parseSingle(text, zoneId);
+        if (parsedOpt.isPresent()) {
+            ParsedTodo pt = parsedOpt.get();
+            if (pt.getDueTime() != null || pt.getDueDate() != null || pt.getRecurrenceType() != TodoRecurrenceType.NONE
+                    || nlpService.isTaskMessage(text)) {
+                TodoTask task = todoService.createTaskFromParsed(user, pt);
+                TodoTaskDto dto = todoService.getTaskDto(task.getId(), user.getId());
+                String msg = TodoMessageBuilder.buildTaskCreatedMessage(dto);
+                apiClient.sendMessage(chatId, msg, keyboardFactory.getTaskCreatedKeyboard(task.getId()), "HTML");
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void sendTaskList(User user, Long chatId, String filter, int page, ZoneId zoneId) {
         int pageSize = 5;
         List<TodoTaskDto> allTasks = todoService.getTodayTasks(user.getId(), zoneId);

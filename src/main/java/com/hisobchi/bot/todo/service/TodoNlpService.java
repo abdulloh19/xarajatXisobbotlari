@@ -37,26 +37,56 @@ public class TodoNlpService {
     // Future task / reminder indicators (intention, to-do, reminder)
     private static final Pattern TASK_TRIGGER_PATTERN = Pattern.compile(
             "\\b(?:eslat|eslatgin|eslatma|eslatvor|eslatib\\s*qo['‘`]?y|napomni|напомни|напомнить|" +
-            "to['‘`]?lashim\\s*kerak|to['‘`]?lash\\s*kerak|to['‘`]?layman|to['‘`]?lash|" +
-            "qilishim\\s*kerak|qilish\\s*kerak|qilay|bajarish\\s*kerak|bajarishim\\s*kerak|bajarish|" +
-            "olishim\\s*kerak|olish\\s*kerak|sotib\\s*olish\\s*kerak|olish|" +
-            "telefon\\s*qilish|tel\\s*qilish|qo['‘`]?ng['‘`]?roq\\s*qilish|" +
+            "to['‘`]?lashim\\s*(?:kerak|kere|kerag)|to['‘`]?lash\\s*(?:kerak|kere|kerag)|to['‘`]?layman|to['‘`]?lash|" +
+            "qilishim\\s*(?:kerak|kere|kerag)|qilish\\s*(?:kerak|kere|kerag)|qilish|qilay|bajarish\\s*(?:kerak|kere|kerag)|bajarishim\\s*(?:kerak|kere|kerag)|bajarish|" +
+            "olishim\\s*(?:kerak|kere|kerag)|olish\\s*(?:kerak|kere|kerag)|sotib\\s*olish\\s*(?:kerak|kere|kerag)|olish|" +
+            "borishim\\s*(?:kerak|kere|kerag)|borish\\s*(?:kerak|kere|kerag)|borish|" +
+            "telefon\\s*qilish|tel\\s*qilish|qo['‘`]?ng['‘`]?roq\\s*qilish|qo['‘`]?ng['‘`]?roq|" +
             "uchrashuv|uchrashish|gaplashish|ko['‘`]?rishish|" +
-            "topshirish\\s*kerak|topshirish|tayyorlash\\s*kerak|tayyorlash|" +
+            "miting|majlis|sobranie|собрание|dars|darsim|repetitor|kurs|trening|mashg['‘`]?ulot|" +
+            "topshirish\\s*(?:kerak|kere|kerag)|topshirish|tayyorlash\\s*(?:kerak|kere|kerag)|tayyorlash|" +
             "vazifa|zadacha|reja|har\\s*oyning|har\\s*kuni|har\\s*hafta)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
-    // Explicit time pattern: "18:00", "09.30", "15:00 da", "soat 18:00 da"
+    // Event or activity pattern
+    private static final Pattern EVENT_OR_ACTION_PATTERN = Pattern.compile(
+            "\\b(?:miting|majlis|sobranie|собрание|dars|darsim|kurs|trening|mashg['‘`]?ulot|" +
+            "uchrashuv|vstrecha|встреча|intervyu|suhbat|doktor|vrach|shifokor|konsultatsiya|" +
+            "telefon|tel|qo['‘`]?ng['‘`]?roq|zvonok|звонок|" +
+            "bor\\b|bo['‘`]?ladi|boladi|boshlanadi|bo['‘`]?lib\\s*o['‘`]?tadi|" +
+            "borish|kelish|ketish|uchish|qilish|yozish|o['‘`]?qish|topshirish|ko['‘`]?rishish|" +
+            "kere\\b|kerak\\b|kerag\\b)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    // Time or relative date indicators
+    private static final Pattern TIME_OR_DATE_PATTERN = Pattern.compile(
+            "\\b(?:soat\\s*\\d{1,2}|\\d{1,2}[:.]\\d{2}|\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi))|" +
+            "bugun|ertaga|indinga|kechqurun|ertalab|saharda|tushda|" +
+            "dushanba|seshanba|chorshanba|payshanba|juma|shanba|yakshanba|" +
+            "завтра|сегодня|послезавтра)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
+    );
+
+    // Explicit time pattern: "18:00", "09.30", "15:00 da", "soat 18:00 da", "12:00-da"
     private static final Pattern TIME_EXPLICIT_PATTERN = Pattern.compile(
-            "(?:soat\\s*)?(\\d{1,2})[:.](\\d{2})(?:\\s*(?:da|ga|dagi))?",
+            "(?:soat\\s*)?(\\d{1,2})[:.](\\d{2})(?:[-–\\s]*(?:da|ga|dagi))?",
             Pattern.CASE_INSENSITIVE
     );
 
-    // Relative hour pattern: "soat 9 da", "9 da", "18 da", "ertalab 9 da", "kechki 6 da"
+    // Relative hour pattern: "soat 9 da", "9 da", "soat 12-da", "12-da", "18 da", "ertalab 9 da", "kechki 6 da", "soat 9 ga", "soat 9-da"
     private static final Pattern HOUR_ONLY_PATTERN = Pattern.compile(
-            "(?:(?:ertalab|saharda|kunduzi|tushda|kechki|kechqurun|oqshom)\\s+)?(?:soat\\s*)?(\\d{1,2})\\s*(?:da|ga|dagi)\\b",
+            "(?:(?:ertalab|saharda|kunduzi|tushda|kechki|kechqurun|oqshom)\\s+)?(?:soat\\s*)?(\\d{1,2})(?:[-–\\s]*(?:da|ga|dagi))\\b",
             Pattern.CASE_INSENSITIVE
+    );
+
+    // Explicit financial intent or currency/multiplier pattern for tasks
+    private static final Pattern FINANCIAL_OR_AMOUNT_PATTERN = Pattern.compile(
+            "\\b(?:to['‘`]?lov|to['‘`]?lash|pul|qarz|nasiya|ijara|kredit|rassrochka|soliq|kommunal|" +
+            "xarid|sotib\\s*olish|narx|narxi|summa|taxminan|evaziga|" +
+            "so['‘`]?m|som|сом|ming\\b|минг\\b|min\\b|мин\\b|k\\b|к\\b|mln\\b|млн\\b|million\\b|миллион\\b|dollar|\\$|usd)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS
     );
 
     // Recurrence patterns
@@ -72,7 +102,7 @@ public class TodoNlpService {
 
     public boolean isTaskMessage(String text) {
         if (text == null || text.isBlank()) return false;
-        String lower = text.toLowerCase();
+        String lower = normalizeCyrillicToLatin(text.toLowerCase().trim());
 
         // If it explicitly matches past-tense expense AND has no task trigger: it's an expense
         boolean hasPastExpense = PAST_EXPENSE_PATTERN.matcher(lower).find();
@@ -87,7 +117,15 @@ public class TodoNlpService {
             return true;
         }
 
-        return hasTaskTrigger;
+        if (hasTaskTrigger) {
+            return true;
+        }
+
+        // Time or Date combined with an event/activity (e.g. "soat 12-da miting bor")
+        boolean hasTimeOrDate = TIME_OR_DATE_PATTERN.matcher(lower).find();
+        boolean hasEventOrAction = EVENT_OR_ACTION_PATTERN.matcher(lower).find();
+
+        return hasTimeOrDate && hasEventOrAction;
     }
 
     public List<ParsedTodo> parseMultiOrSingle(String text, ZoneId zoneId) {
@@ -136,8 +174,27 @@ public class TodoNlpService {
         boolean hasTask = TASK_TRIGGER_PATTERN.matcher(lower).find();
         boolean isExpense = hasPast && !hasTask;
 
-        // 1. Amount extraction
-        BigDecimal amount = amountParser.parse(lower).orElse(null);
+        // 1. Amount extraction - ONLY if financial intent or explicit currency/multiplier is present
+        BigDecimal amount = null;
+        boolean hasFinancialIntent = FINANCIAL_OR_AMOUNT_PATTERN.matcher(lower).find();
+        if (hasFinancialIntent) {
+            // Strip time and date expressions so that "soat 9 da", "18:00", "12-da" are not parsed as amount
+            String textForAmount = lower;
+            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat\\s*)?\\d{1,2}[:.]\\d{2}(?:[-–\\s]*(?:da|ga|dagi))?\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\b(?:soat\\s*)?\\d{1,2}(?:[-–\\s]*(?:da|ga|dagi))\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\bhar\\s*oyning\\s*\\d{1,2}(?:-)?(?:kuni|kunida|sida|chi|chisi)?\\b", " ");
+            textForAmount = textForAmount.replaceAll("(?i)\\b\\d{1,2}(?:-)?(?:yanvar|fevral|mart|aprel|may|iyun|iyul|avgust|sentabr|oktabr|noyabr|dekabr)\\b", " ");
+
+            amount = amountParser.parse(textForAmount).orElse(null);
+
+            // Double check: if amount is suspiciously small (< 1000) and no explicit currency word was in text, drop it
+            if (amount != null && amount.compareTo(BigDecimal.valueOf(1000)) < 0) {
+                boolean hasExplicitCurrency = textForAmount.matches(".*\\b(?:so['‘`]?m|som|сом|dollar|\\$|usd|rubl|yevro|evro)\\b.*");
+                if (!hasExplicitCurrency) {
+                    amount = null;
+                }
+            }
+        }
 
         // 2. Date extraction
         LocalDate today = LocalDate.now(zoneId);
