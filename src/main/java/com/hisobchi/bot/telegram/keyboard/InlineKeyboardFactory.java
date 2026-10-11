@@ -306,6 +306,17 @@ public class InlineKeyboardFactory {
                 .build();
     }
 
+    public InlineKeyboardMarkup getDebtActionCompletedKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🏠 Asosiy menyu", "menu:main"),
+                                new InlineKeyboardButton("🤝 Qarzlar menyusi", "debt:menu")
+                        )
+                ))
+                .build();
+    }
+
     public InlineKeyboardMarkup getDailyOperationsKeyboard(List<Transaction> transactions, LocalDate date) {
         return getDailyOperationsKeyboard(transactions, List.of(), date);
     }

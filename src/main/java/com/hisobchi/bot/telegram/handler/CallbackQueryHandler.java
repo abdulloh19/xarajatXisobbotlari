@@ -92,7 +92,14 @@ public class CallbackQueryHandler {
             case "draft" -> handleDraftCallback(user, chatId, messageId, parts);
             case "day" -> handleDayCallback(user, chatId, messageId, parts);
             case "tx" -> handleTransactionCallback(user, chatId, messageId, parts);
-            case "debt" -> handleDebtCallback(user, chatId, messageId, parts);
+            case "debt" -> {
+                if (parts.length > 1 && "menu".equals(parts[1])) {
+                    textMessageHandler.setUserActiveMenu(user.getId(), "DEBTS");
+                    apiClient.sendMessage(chatId, "🤝 <b>Qarzlar menyusi:</b>", replyKeyboardFactory.getDebtsMenu(), "HTML");
+                } else {
+                    handleDebtCallback(user, chatId, messageId, parts);
+                }
+            }
             case "debt_create" -> handleDebtCreateCallback(user, chatId, messageId, parts);
             case "debt_pay" -> handleDebtPayCallback(user, chatId, messageId, parts);
             case "debt_ret" -> handleDebtReturnCallback(user, chatId, messageId, parts);
@@ -106,6 +113,7 @@ public class CallbackQueryHandler {
             case "menu" -> {
                 if (parts.length > 1 && "main".equals(parts[1])) {
                     userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    textMessageHandler.setUserActiveMenu(user.getId(), null);
                     apiClient.sendMessage(chatId, "🏠 <b>Asosiy menyu:</b>", replyKeyboardFactory.getMainMenu(), "HTML");
                 }
             }
@@ -232,7 +240,6 @@ public class CallbackQueryHandler {
                 var draftOpt = debtDraftService.findValidDraft(id, user.getId());
                 if (draftOpt.isPresent()) {
                     Debt saved = debtService.saveFromDraft(draftOpt.get());
-                    BigDecimal available = balanceService.getAvailableBalance(user.getId());
 
                     String profitNote = "";
                     if (saved.getType() == DebtType.LENT) {
@@ -260,16 +267,12 @@ public class CallbackQueryHandler {
 
                                 🤝 %sning qarzi:
                                 <b>%s</b>
-
-                                💰 Sizda hozir qoldi:
-                                <b>%s</b>
                                 """,
                                 profitNote,
                                 BotMessageBuilder.escapeHtml(saved.getPersonName()),
                                 MoneyFormatter.format(saved.getAmount()),
                                 BotMessageBuilder.escapeHtml(saved.getPersonName()),
-                                MoneyFormatter.format(saved.getRemainingAmount()),
-                                MoneyFormatter.format(available)
+                                MoneyFormatter.format(saved.getRemainingAmount())
                         );
                     } else {
                         msg = String.format("""
@@ -281,24 +284,20 @@ public class CallbackQueryHandler {
 
                                 🤝 Sizning qarzingiz:
                                 <b>%s</b>
-
-                                💰 Sizda hozir mavjud:
-                                <b>%s</b>
                                 """,
                                 BotMessageBuilder.escapeHtml(saved.getPersonName()),
                                 MoneyFormatter.format(saved.getAmount()),
-                                MoneyFormatter.format(saved.getRemainingAmount()),
-                                MoneyFormatter.format(available)
+                                MoneyFormatter.format(saved.getRemainingAmount())
                         );
                     }
-                    apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+                    apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionCompletedKeyboard(), "HTML");
                 } else {
-                    apiClient.editMessageText(chatId, messageId, "⚠️ Qarz drafti topilmadi yoki muddati o‘tgan.", null, null);
+                    apiClient.editMessageText(chatId, messageId, "⚠️ Qarz drafti topilmadi yoki muddati o‘tgan.", inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
                 }
             }
             case "cancel" -> {
                 debtDraftService.deleteDraft(id);
-                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
             }
             case "history" -> {
                 var debtOpt = debtService.getDebt(id, user.getId());
@@ -594,7 +593,6 @@ public class CallbackQueryHandler {
                 }
 
                 Debt updated = payment.getDebt();
-                BigDecimal available = balanceService.getAvailableBalance(user.getId());
                 debtFlowService.clearSession(user.getId());
 
                 String msg = String.format("""
@@ -609,18 +607,14 @@ public class CallbackQueryHandler {
 
                         🔴 Endi qolgan qarz:
                         <b>%s</b>
-
-                        💰 Sizda mavjud:
-                        <b>%s</b>
                         """,
                         profitNote,
                         BotMessageBuilder.escapeHtml(updated.getPersonName()),
                         MoneyFormatter.format(payAmt),
                         MoneyFormatter.format(updated.getRemainingAmount().add(payAmt)),
-                        MoneyFormatter.format(updated.getRemainingAmount()),
-                        MoneyFormatter.format(available)
+                        MoneyFormatter.format(updated.getRemainingAmount())
                 );
-                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+                apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionCompletedKeyboard(), "HTML");
             }
             case "confirm_full", "confirm_full_today", "confirm_full_yesterday", "confirm_full_separate" -> {
                 Long debtId = Long.parseLong(parts[2]);
@@ -646,7 +640,6 @@ public class CallbackQueryHandler {
                 }
 
                 Debt updated = payment.getDebt();
-                BigDecimal available = balanceService.getAvailableBalance(user.getId());
                 debtFlowService.clearSession(user.getId());
 
                 String msg = String.format("""
@@ -654,20 +647,16 @@ public class CallbackQueryHandler {
                         👤 <b>%s</b>
                         💰 To‘landi: <b>%s</b>
                         📌 Qoldiq: <b>0 so‘m</b>
-
-                        💰 Sizda mavjud:
-                        <b>%s</b>
                         """,
                         profitNote,
                         BotMessageBuilder.escapeHtml(updated.getPersonName()),
-                        MoneyFormatter.format(updated.getOriginalAmount()),
-                        MoneyFormatter.format(available)
+                        MoneyFormatter.format(updated.getOriginalAmount())
                 );
-                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+                apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionCompletedKeyboard(), "HTML");
             }
             case "cancel" -> {
                 debtFlowService.clearSession(user.getId());
-                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
             }
         }
     }
@@ -841,7 +830,7 @@ public class CallbackQueryHandler {
                         MoneyFormatter.format(updated.getRemainingAmount()),
                         methodAddLine
                 );
-                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+                apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionCompletedKeyboard(), "HTML");
             }
             case "confirm_full" -> {
                 Long debtId = Long.parseLong(parts[2]);
@@ -869,11 +858,11 @@ public class CallbackQueryHandler {
                         BotMessageBuilder.escapeHtml(updated.getPersonName()),
                         methodAddLine
                 );
-                apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+                apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getDebtActionCompletedKeyboard(), "HTML");
             }
             case "cancel" -> {
                 debtFlowService.clearSession(user.getId());
-                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+                apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
             }
         }
     }
@@ -909,7 +898,7 @@ public class CallbackQueryHandler {
                             inlineKeyboardFactory.getDebtPaymentMethodSelectionKeyboard(debtId, "debt_ret"), null);
                 }
             }
-            case "cancel" -> apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", null, null);
+            case "cancel" -> apiClient.editMessageText(chatId, messageId, "❌ Bekor qilindi.", inlineKeyboardFactory.getMainMenuReturnKeyboard(), null);
         }
     }
 
