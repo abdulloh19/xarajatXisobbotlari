@@ -64,13 +64,14 @@ public class StatisticsService {
         BigDecimal totalExpenseWithDebts = totalExpense.add(lentDebt).add(paidDebt);
 
         Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), date);
-        BigDecimal enteredProfit = BigDecimal.ZERO;
-        if (profitOpt.isPresent()) {
-            enteredProfit = profitOpt.get().getTotalProfit();
-        } else {
-            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
-            if (inc != null) enteredProfit = inc;
-        }
+        BigDecimal dailyProfitVal = (profitOpt.isPresent() && profitOpt.get().getTotalProfit() != null)
+                ? profitOpt.get().getTotalProfit()
+                : BigDecimal.ZERO;
+
+        BigDecimal txIncome = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+        if (txIncome == null) txIncome = BigDecimal.ZERO;
+
+        BigDecimal enteredProfit = dailyProfitVal.add(txIncome);
 
         // FORMULA: totalEarned = profit + expenses, netProfit = enteredProfit (real profit)
         BigDecimal totalEarned = enteredProfit.add(totalExpenseWithDebts);
@@ -95,10 +96,25 @@ public class StatisticsService {
         }
         categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
+        List<CategoryExpenseDto> incList = transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.INCOME, date);
+        List<CategoryExpenseDto> incomeCategories = new ArrayList<>(incList != null ? incList : List.of());
+        if (profitOpt.isPresent() && dailyProfitVal.compareTo(BigDecimal.ZERO) > 0) {
+            DailyProfit dp = profitOpt.get();
+            BigDecimal cash = dp.getCashAmount() != null ? dp.getCashAmount() : BigDecimal.ZERO;
+            BigDecimal card = dp.getCardAmount() != null ? dp.getCardAmount() : BigDecimal.ZERO;
+            if (cash.compareTo(BigDecimal.ZERO) > 0 && card.compareTo(BigDecimal.ZERO) > 0) {
+                incomeCategories.add(new CategoryExpenseDto(null, "Kunlik foyda (naqd)", "💵", cash, 1L));
+                incomeCategories.add(new CategoryExpenseDto(null, "Kunlik foyda (karta)", "💳", card, 1L));
+            } else {
+                incomeCategories.add(new CategoryExpenseDto(null, "Kiritilgan kunlik foyda", "💵", dailyProfitVal, 1L));
+            }
+        }
+        incomeCategories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+
         boolean isClosed = dailySummaryService.isDayClosed(user.getId(), date);
         boolean isOffDay = dailyProfitService.isOffDay(user.getId(), date);
 
-        return new DailyStatisticsDto(date, totalEarned, totalExpenseWithDebts, netProfit, count, categories, isClosed, isOffDay);
+        return new DailyStatisticsDto(date, totalEarned, totalExpenseWithDebts, netProfit, count, categories, isClosed, isOffDay, incomeCategories);
     }
 
     @Transactional(readOnly = true)
@@ -131,17 +147,15 @@ public class StatisticsService {
         BigDecimal totalProfit = BigDecimal.ZERO;
         for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
             DailyProfit p = profitMap.get(d);
-            if (p != null && !p.isWorkDay()) {
-                continue;
+            BigDecimal dayProfit = BigDecimal.ZERO;
+            if (p != null && p.isWorkDay() && p.getTotalProfit() != null) {
+                dayProfit = dayProfit.add(p.getTotalProfit());
             }
-            if (p != null && p.isWorkDay()) {
-                if (p.getTotalProfit() != null) totalProfit = totalProfit.add(p.getTotalProfit());
-            } else {
-                BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
-                if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
-                    totalProfit = totalProfit.add(inc);
-                }
+            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
+            if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
+                dayProfit = dayProfit.add(inc);
             }
+            totalProfit = totalProfit.add(dayProfit);
         }
 
         BigDecimal totalEarned = totalProfit.add(totalExpenseWithDebts);
@@ -169,7 +183,20 @@ public class StatisticsService {
 
         CategoryExpenseDto topCategory = categories.isEmpty() ? null : categories.get(0);
 
-        return new WeeklyStatisticsDto(startDate, endDate, totalEarned, totalExpenseWithDebts, netProfit, count, categories, topCategory);
+        List<CategoryExpenseDto> incBetween = transactionRepository.findCategoryExpensesBetween(user.getId(), TransactionType.INCOME, startDate, endDate);
+        List<CategoryExpenseDto> incomeCategories = new ArrayList<>(incBetween != null ? incBetween : List.of());
+        BigDecimal totalDailyProfitSum = BigDecimal.ZERO;
+        for (DailyProfit dp : profitList) {
+            if (dp.isWorkDay() && dp.getTotalProfit() != null && dp.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+                totalDailyProfitSum = totalDailyProfitSum.add(dp.getTotalProfit());
+            }
+        }
+        if (totalDailyProfitSum.compareTo(BigDecimal.ZERO) > 0) {
+            incomeCategories.add(new CategoryExpenseDto(null, "Kiritilgan kunlik foydalar", "💵", totalDailyProfitSum, (long) profitList.size()));
+        }
+        incomeCategories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+
+        return new WeeklyStatisticsDto(startDate, endDate, totalEarned, totalExpenseWithDebts, netProfit, count, categories, topCategory, incomeCategories);
     }
 
     @Transactional(readOnly = true)
@@ -210,20 +237,22 @@ public class StatisticsService {
 
         for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
             DailyProfit p = profitMap.get(d);
-            if (p != null && !p.isWorkDay()) {
-                continue;
-            }
+            boolean dayHasActivity = false;
             if (p != null && p.isWorkDay()) {
-                completedDays++;
                 if (p.getCashAmount() != null) cashSum = cashSum.add(p.getCashAmount());
                 if (p.getCardAmount() != null) cardSum = cardSum.add(p.getCardAmount());
-                if (p.getTotalProfit() != null) totalProfit = totalProfit.add(p.getTotalProfit());
-            } else {
-                BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
-                if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
-                    completedDays++;
-                    totalProfit = totalProfit.add(inc);
+                if (p.getTotalProfit() != null && p.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+                    totalProfit = totalProfit.add(p.getTotalProfit());
+                    dayHasActivity = true;
                 }
+            }
+            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, d);
+            if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
+                totalProfit = totalProfit.add(inc);
+                dayHasActivity = true;
+            }
+            if (dayHasActivity || (p != null && p.isWorkDay())) {
+                completedDays++;
             }
         }
 
@@ -259,6 +288,19 @@ public class StatisticsService {
         }
         categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
+        List<CategoryExpenseDto> incBetweenMonth = transactionRepository.findCategoryExpensesBetween(user.getId(), TransactionType.INCOME, startDate, endDate);
+        List<CategoryExpenseDto> incomeCategories = new ArrayList<>(incBetweenMonth != null ? incBetweenMonth : List.of());
+        BigDecimal totalMonthlyDailyProfit = BigDecimal.ZERO;
+        for (DailyProfit dp : profitList) {
+            if (dp.isWorkDay() && dp.getTotalProfit() != null && dp.getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+                totalMonthlyDailyProfit = totalMonthlyDailyProfit.add(dp.getTotalProfit());
+            }
+        }
+        if (totalMonthlyDailyProfit.compareTo(BigDecimal.ZERO) > 0) {
+            incomeCategories.add(new CategoryExpenseDto(null, "Kiritilgan kunlik foydalar", "💵", totalMonthlyDailyProfit, (long) profitList.size()));
+        }
+        incomeCategories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+
         return new MonthlyStatisticsDto(
                 referenceDate,
                 totalEarned,
@@ -270,7 +312,8 @@ public class StatisticsService {
                 avgDailyIncome,
                 avgDailyExpense,
                 avgDailyNetProfit,
-                categories
+                categories,
+                incomeCategories
         );
     }
 

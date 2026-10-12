@@ -59,16 +59,17 @@ public class ReportService {
 
         if (profitOpt.isPresent()) {
             DailyProfit p = profitOpt.get();
-            cash = p.getCashAmount();
-            card = p.getCardAmount();
-            profit = p.getTotalProfit();
+            cash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+            card = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+            profit = p.getTotalProfit() != null ? p.getTotalProfit() : BigDecimal.ZERO;
+            if (p.isWorkDay()) entered = true;
+        }
+
+        BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.INCOME, date);
+        if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
+            profit = profit.add(inc);
+            cash = cash.add(inc);
             entered = true;
-        } else {
-            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(userId, TransactionType.INCOME, date);
-            if (inc != null && inc.compareTo(BigDecimal.ZERO) > 0) {
-                profit = inc;
-                entered = true;
-            }
         }
 
         // Section 64: JAMI ISHLANGAN = XARAJAT + USER KIRITGAN FOYDA
@@ -90,6 +91,13 @@ public class ReportService {
         }
         categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
+        List<CategoryExpenseDto> incList = transactionRepository.findCategoryExpensesByDate(userId, TransactionType.INCOME, date);
+        List<CategoryExpenseDto> categoryIncomes = new ArrayList<>(incList != null ? incList : List.of());
+        if (profitOpt.isPresent() && profitOpt.get().getTotalProfit() != null && profitOpt.get().getTotalProfit().compareTo(BigDecimal.ZERO) > 0) {
+            categoryIncomes.add(new CategoryExpenseDto(null, "Kiritilgan kunlik foyda", "💵", profitOpt.get().getTotalProfit(), 1L));
+        }
+        categoryIncomes.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+
         return ReportData.builder()
                 .title("BUGUNGI YAKUNIY HISOBOT")
                 .periodStart(date)
@@ -104,6 +112,7 @@ public class ReportService {
                 .incompleteDays(entered ? 0 : 1)
                 .incompleteDates(entered ? List.of() : List.of(date))
                 .categoryExpenses(categories)
+                .categoryIncomes(categoryIncomes)
                 .profitEntered(entered)
                 .build();
     }
@@ -192,7 +201,12 @@ public class ReportService {
                     : 1L;
             categories.add(new CategoryExpenseDto(null, "To‘langan qarz", "💳", paidDebt, Math.max(1, paidCount)));
         }
-        categories.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
+        List<CategoryExpenseDto> incList = transactionRepository.findCategoryExpensesBetween(userId, TransactionType.INCOME, start, end);
+        List<CategoryExpenseDto> categoryIncomes = new ArrayList<>(incList != null ? incList : List.of());
+        if (profitSum.compareTo(BigDecimal.ZERO) > 0) {
+            categoryIncomes.add(new CategoryExpenseDto(null, "Kiritilgan foydalar", "💵", profitSum, (long) completedDays));
+        }
+        categoryIncomes.sort((a, b) -> b.totalAmount().compareTo(a.totalAmount()));
 
         return ReportData.builder()
                 .title(title)
@@ -208,6 +222,7 @@ public class ReportService {
                 .incompleteDays(incompleteDays)
                 .incompleteDates(incompleteDates)
                 .categoryExpenses(categories)
+                .categoryIncomes(categoryIncomes)
                 .profitEntered(completedDays > 0)
                 .build();
     }
@@ -236,6 +251,16 @@ public class ReportService {
             sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
             sb.append("━━━━━━━━━━━━━━━━━━\n");
         }
+
+        if (data.categoryIncomes() != null && !data.categoryIncomes().isEmpty()) {
+            sb.append("💰 <b>DAROMADLAR / FOYDA:</b>\n\n");
+            for (CategoryExpenseDto c : data.categoryIncomes()) {
+                sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
+                        .append("\n").append(MoneyFormatter.format(c.totalAmount())).append("\n\n");
+            }
+            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        }
+
         sb.append("📁 <b>XARAJATLAR:</b>\n\n");
 
         if (data.categoryExpenses().isEmpty()) {
@@ -315,6 +340,15 @@ public class ReportService {
             sb.append("💰 <b>Jami mavjud:</b> ").append(MoneyFormatter.format(b.getAvailableBalance())).append("\n\n");
         }
 
+        if (data.categoryIncomes() != null && !data.categoryIncomes().isEmpty()) {
+            sb.append("━━━━━━━━━━━━━━━━━━\n");
+            sb.append("💰 <b>Daromadlar:</b>\n\n");
+            for (CategoryExpenseDto c : data.categoryIncomes()) {
+                sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
+                        .append(" — <b>").append(MoneyFormatter.format(c.totalAmount())).append("</b>\n");
+            }
+        }
+
         if (!data.categoryExpenses().isEmpty()) {
             sb.append("━━━━━━━━━━━━━━━━━━\n");
             sb.append("📂 <b>Xarajatlar:</b>\n\n");
@@ -344,6 +378,16 @@ public class ReportService {
             sb.append("💳 <b>Karta:</b> ").append(MoneyFormatter.format(data.cardProfit())).append("\n\n");
             sb.append("━━━━━━━━━━━━━━━━━━\n");
         }
+
+        if (data.categoryIncomes() != null && !data.categoryIncomes().isEmpty()) {
+            sb.append("💰 <b>DAROMADLAR / FOYDA:</b>\n\n");
+            for (CategoryExpenseDto c : data.categoryIncomes()) {
+                sb.append(c.categoryEmoji()).append(" ").append(BotMessageBuilder.escapeHtml(c.categoryName()))
+                        .append(" — <b>").append(MoneyFormatter.format(c.totalAmount())).append("</b>\n");
+            }
+            sb.append("\n━━━━━━━━━━━━━━━━━━\n");
+        }
+
         sb.append("📁 <b>XARAJATLAR:</b>\n\n");
 
         if (data.categoryExpenses().isEmpty()) {

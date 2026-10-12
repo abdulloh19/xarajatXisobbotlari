@@ -22,5 +22,6 @@ public record ReportData(
         long incompleteDays,
         List<LocalDate> incompleteDates,
         List<CategoryExpenseDto> categoryExpenses,
+        List<CategoryExpenseDto> categoryIncomes,
         boolean profitEntered
 ) {}

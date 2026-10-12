@@ -154,6 +154,15 @@ public final class BotMessageBuilder {
         sb.append("✅ <b>BUGUNGI FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
 
+        if (stats.incomeCategories() != null && !stats.incomeCategories().isEmpty()) {
+            sb.append("💰 <b>DAROMADLAR / FOYDA:</b>\n\n");
+            for (CategoryExpenseDto cat : stats.incomeCategories()) {
+                sb.append(cat.getDisplayName()).append("\n")
+                        .append(MoneyFormatter.format(cat.totalAmount())).append("\n\n");
+            }
+            sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        }
+
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
             sb.append("📁 <b>XARAJATLAR:</b>\n\n");
             for (CategoryExpenseDto cat : stats.expenseCategories()) {
@@ -180,6 +189,15 @@ public final class BotMessageBuilder {
         sb.append("━━━━━━━━━━━━━━━━━━\n");
         sb.append("✅ <b>HAFTALIK FOYDANGIZ:</b>\n<b>").append(MoneyFormatter.format(stats.netProfit())).append("</b>\n");
         sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+
+        if (stats.incomeCategories() != null && !stats.incomeCategories().isEmpty()) {
+            sb.append("💰 <b>DAROMADLAR / FOYDA:</b>\n\n");
+            for (CategoryExpenseDto cat : stats.incomeCategories()) {
+                sb.append(cat.getDisplayName()).append(" — ")
+                        .append(MoneyFormatter.format(cat.totalAmount())).append("\n");
+            }
+            sb.append("\n");
+        }
 
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
             sb.append("📁 <b>XARAJATLAR:</b>\n\n");
@@ -217,8 +235,17 @@ public final class BotMessageBuilder {
             sb.append("━━━━━━━━━━━━━━━━━━\n\n");
         }
 
+        if (stats.incomeCategories() != null && !stats.incomeCategories().isEmpty()) {
+            sb.append("💰 <b>DAROMADLAR / FOYDA:</b>\n\n");
+            for (CategoryExpenseDto cat : stats.incomeCategories()) {
+                sb.append(cat.getDisplayName()).append(" — ")
+                        .append(MoneyFormatter.format(cat.totalAmount())).append("\n");
+            }
+            sb.append("\n━━━━━━━━━━━━━━━━━━\n\n");
+        }
+
         if (stats.expenseCategories() != null && !stats.expenseCategories().isEmpty()) {
-            sb.append("📂 <b>Xarajatlar:</b>\n\n");
+            sb.append("📁 <b>XARAJATLAR:</b>\n\n");
             for (CategoryExpenseDto cat : stats.expenseCategories()) {
                 sb.append(cat.getDisplayName()).append("\n")
                         .append(MoneyFormatter.format(cat.totalAmount())).append("\n\n");

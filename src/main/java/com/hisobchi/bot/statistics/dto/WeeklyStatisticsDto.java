@@ -12,5 +12,10 @@ public record WeeklyStatisticsDto(
         BigDecimal netProfit,
         long transactionCount,
         List<CategoryExpenseDto> expenseCategories,
-        CategoryExpenseDto topExpenseCategory
-) {}
+        CategoryExpenseDto topExpenseCategory,
+        List<CategoryExpenseDto> incomeCategories
+) {
+    public WeeklyStatisticsDto(LocalDate startDate, LocalDate endDate, BigDecimal totalIncome, BigDecimal totalExpense, BigDecimal netProfit, long transactionCount, List<CategoryExpenseDto> expenseCategories, CategoryExpenseDto topExpenseCategory) {
+        this(startDate, endDate, totalIncome, totalExpense, netProfit, transactionCount, expenseCategories, topExpenseCategory, List.of());
+    }
+}

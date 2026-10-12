@@ -12,9 +12,14 @@ public record DailyStatisticsDto(
         long transactionCount,
         List<CategoryExpenseDto> expenseCategories,
         boolean isClosed,
-        boolean isOffDay
+        boolean isOffDay,
+        List<CategoryExpenseDto> incomeCategories
 ) {
+    public DailyStatisticsDto(LocalDate date, BigDecimal totalIncome, BigDecimal totalExpense, BigDecimal netProfit, long transactionCount, List<CategoryExpenseDto> expenseCategories, boolean isClosed, boolean isOffDay) {
+        this(date, totalIncome, totalExpense, netProfit, transactionCount, expenseCategories, isClosed, isOffDay, List.of());
+    }
+
     public DailyStatisticsDto(LocalDate date, BigDecimal totalIncome, BigDecimal totalExpense, BigDecimal netProfit, long transactionCount, List<CategoryExpenseDto> expenseCategories, boolean isClosed) {
-        this(date, totalIncome, totalExpense, netProfit, transactionCount, expenseCategories, isClosed, false);
+        this(date, totalIncome, totalExpense, netProfit, transactionCount, expenseCategories, isClosed, false, List.of());
     }
 }

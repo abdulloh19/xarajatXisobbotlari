@@ -15,7 +15,8 @@ public record MonthlyStatisticsDto(
         BigDecimal averageDailyIncome,
         BigDecimal averageDailyExpense,
         BigDecimal averageDailyNetProfit,
-        List<CategoryExpenseDto> expenseCategories
+        List<CategoryExpenseDto> expenseCategories,
+        List<CategoryExpenseDto> incomeCategories
 ) {
     public MonthlyStatisticsDto(
             LocalDate monthDate,
@@ -28,6 +29,22 @@ public record MonthlyStatisticsDto(
             BigDecimal averageDailyNetProfit,
             List<CategoryExpenseDto> expenseCategories) {
         this(monthDate, totalIncome, totalExpense, netProfit, BigDecimal.ZERO, BigDecimal.ZERO,
-                activeDays, averageDailyIncome, averageDailyExpense, averageDailyNetProfit, expenseCategories);
+                activeDays, averageDailyIncome, averageDailyExpense, averageDailyNetProfit, expenseCategories, List.of());
+    }
+
+    public MonthlyStatisticsDto(
+            LocalDate monthDate,
+            BigDecimal totalIncome,
+            BigDecimal totalExpense,
+            BigDecimal netProfit,
+            BigDecimal cashProfit,
+            BigDecimal cardProfit,
+            long activeDays,
+            BigDecimal averageDailyIncome,
+            BigDecimal averageDailyExpense,
+            BigDecimal averageDailyNetProfit,
+            List<CategoryExpenseDto> expenseCategories) {
+        this(monthDate, totalIncome, totalExpense, netProfit, cashProfit, cardProfit,
+                activeDays, averageDailyIncome, averageDailyExpense, averageDailyNetProfit, expenseCategories, List.of());
     }
 }

@@ -4,6 +4,7 @@ import com.hisobchi.bot.debt.entity.DebtType;
 import com.hisobchi.bot.debt.repository.DebtRepository;
 import com.hisobchi.bot.profit.entity.DailyProfit;
 import com.hisobchi.bot.profit.service.DailyProfitService;
+import com.hisobchi.bot.statistics.dto.CategoryExpenseDto;
 import com.hisobchi.bot.statistics.dto.DailyStatisticsDto;
 import com.hisobchi.bot.statistics.dto.MonthlyStatisticsDto;
 import com.hisobchi.bot.statistics.dto.WeeklyStatisticsDto;
@@ -24,8 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -200,5 +200,81 @@ class StatisticsServiceTest {
         boolean hasPaidDebtCategory = stats.expenseCategories().stream()
                 .anyMatch(c -> "To‘langan qarz".equals(c.categoryName()) && c.totalAmount().compareTo(new BigDecimal("150000")) == 0);
         assertTrue(hasPaidDebtCategory, "To‘langan qarz xarajatlar ro'yxatida bo'lishi kerak");
+    }
+
+    @Test
+    @DisplayName("DailyStatistics preserves and displays income transactions even when dailyProfit is zero")
+    void testDailyStatisticsWithIncomeTransactionsWhenDailyProfitIsZero() {
+        User user = User.builder().id(1L).build();
+        LocalDate today = LocalDate.of(2026, 10, 12);
+
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.EXPENSE, today))
+                .thenReturn(new BigDecimal("314000"));
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today))
+                .thenReturn(new BigDecimal("500000"));
+
+        DailyProfit zeroProfit = DailyProfit.builder()
+                .profitDate(today)
+                .totalProfit(BigDecimal.ZERO)
+                .cashAmount(BigDecimal.ZERO)
+                .cardAmount(BigDecimal.ZERO)
+                .isWorkDay(true)
+                .build();
+        when(dailyProfitService.getProfit(user.getId(), today)).thenReturn(Optional.of(zeroProfit));
+        when(transactionRepository.countByUserIdAndDate(user.getId(), today)).thenReturn(6L);
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, today)).thenReturn(List.of(
+                new CategoryExpenseDto(1L, "Yoqilg‘i", "⛽", new BigDecimal("50000"), 1L)
+        ));
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.INCOME, today)).thenReturn(List.of(
+                new CategoryExpenseDto(2L, "Savdo", "🛒", new BigDecimal("500000"), 1L)
+        ));
+        when(dailySummaryService.isDayClosed(user.getId(), today)).thenReturn(false);
+
+        DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+
+        // netProfit must be 500 000 (from income transactions), NOT 0!
+        assertEquals(new BigDecimal("500000"), stats.netProfit());
+        assertEquals(new BigDecimal("314000"), stats.totalExpense());
+        // totalEarned = 500 000 + 314 000 = 814 000
+        assertEquals(new BigDecimal("814000"), stats.totalIncome());
+        assertNotNull(stats.incomeCategories());
+        assertFalse(stats.incomeCategories().isEmpty());
+        assertEquals("Savdo", stats.incomeCategories().get(0).categoryName());
+        assertEquals(new BigDecimal("500000"), stats.incomeCategories().get(0).totalAmount());
+    }
+
+    @Test
+    @DisplayName("DailyStatistics combines both dailyProfit and transaction incomes")
+    void testDailyStatisticsWithBothIncomeTransactionsAndDailyProfit() {
+        User user = User.builder().id(1L).build();
+        LocalDate today = LocalDate.of(2026, 10, 12);
+
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.EXPENSE, today))
+                .thenReturn(new BigDecimal("100000"));
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today))
+                .thenReturn(new BigDecimal("200000"));
+
+        DailyProfit profit = DailyProfit.builder()
+                .profitDate(today)
+                .totalProfit(new BigDecimal("300000"))
+                .cashAmount(new BigDecimal("300000"))
+                .cardAmount(BigDecimal.ZERO)
+                .isWorkDay(true)
+                .build();
+        when(dailyProfitService.getProfit(user.getId(), today)).thenReturn(Optional.of(profit));
+        when(transactionRepository.countByUserIdAndDate(user.getId(), today)).thenReturn(3L);
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, today)).thenReturn(List.of());
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.INCOME, today)).thenReturn(List.of(
+                new CategoryExpenseDto(2L, "Qo‘shimcha daromad", "💰", new BigDecimal("200000"), 1L)
+        ));
+        when(dailySummaryService.isDayClosed(user.getId(), today)).thenReturn(false);
+
+        DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+
+        // netProfit = 300 000 + 200 000 = 500 000
+        assertEquals(new BigDecimal("500000"), stats.netProfit());
+        // totalEarned = 500 000 + 100 000 = 600 000
+        assertEquals(new BigDecimal("600000"), stats.totalIncome());
+        assertEquals(2, stats.incomeCategories().size());
     }
 }

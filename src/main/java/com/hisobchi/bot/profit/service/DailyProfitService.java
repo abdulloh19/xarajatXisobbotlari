@@ -119,18 +119,12 @@ public class DailyProfitService {
     public void deductFromProfit(User user, LocalDate date, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
         Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
-        DailyProfit p;
-        if (profitOpt.isPresent()) {
-            p = profitOpt.get();
-        } else {
-            BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
-            p = DailyProfit.builder()
-                    .user(user)
-                    .profitDate(date)
-                    .cashAmount(inc != null ? inc : BigDecimal.ZERO)
-                    .cardAmount(BigDecimal.ZERO)
-                    .isWorkDay(true)
-                    .build();
+        if (profitOpt.isEmpty()) {
+            return;
+        }
+        DailyProfit p = profitOpt.get();
+        if (!p.isWorkDay()) {
+            return;
         }
         BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
         BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
@@ -155,17 +149,14 @@ public class DailyProfitService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return getProfit(user.getId(), date).orElse(null);
         }
-        DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
-                .orElseGet(() -> {
-                    BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
-                    return DailyProfit.builder()
-                            .user(user)
-                            .profitDate(date)
-                            .cashAmount(inc != null ? inc : BigDecimal.ZERO)
-                            .cardAmount(BigDecimal.ZERO)
-                            .isWorkDay(true)
-                            .build();
-                });
+        Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
+        if (profitOpt.isEmpty()) {
+            return null;
+        }
+        DailyProfit p = profitOpt.get();
+        if (!p.isWorkDay()) {
+            return p;
+        }
         BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
         BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
 
@@ -215,16 +206,11 @@ public class DailyProfitService {
             return getProfit(user.getId(), date).orElse(null);
         }
         DailyProfit p = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date)
-                .orElseGet(() -> {
-                    BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
-                    return DailyProfit.builder()
-                            .user(user)
-                            .profitDate(date)
-                            .cashAmount(inc != null ? inc : BigDecimal.ZERO)
-                            .cardAmount(BigDecimal.ZERO)
-                            .isWorkDay(true)
-                            .build();
-                });
+                .orElseGet(() -> DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .isWorkDay(true)
+                        .build());
         BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
         BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
 
@@ -258,13 +244,17 @@ public class DailyProfitService {
 
     @Transactional(readOnly = true)
     public BigDecimal getTodayProfitOrIncome(User user, LocalDate today) {
+        BigDecimal total = BigDecimal.ZERO;
         Optional<DailyProfit> todayProfitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), today);
         if (todayProfitOpt.isPresent()
                 && todayProfitOpt.get().isWorkDay()
                 && todayProfitOpt.get().getTotalProfit() != null) {
-            return todayProfitOpt.get().getTotalProfit();
+            total = total.add(todayProfitOpt.get().getTotalProfit());
         }
         BigDecimal inc = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today);
-        return inc != null ? inc : BigDecimal.ZERO;
+        if (inc != null) {
+            total = total.add(inc);
+        }
+        return total;
     }
 }
