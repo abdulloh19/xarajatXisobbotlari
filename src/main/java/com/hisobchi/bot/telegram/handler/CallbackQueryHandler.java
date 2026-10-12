@@ -1218,12 +1218,8 @@ public class CallbackQueryHandler {
             TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), today);
 
             // Alohida xarajat: Kunlik foydadan ayirilmaydi (foydaga tegilmaydi).
-            DailyProfit existingProfit = dailyProfitService.getProfit(user.getId(), today).orElse(null);
             DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
-
-            String profitText = (existingProfit != null && existingProfit.getTotalProfit() != null)
-                    ? MoneyFormatter.format(existingProfit.getTotalProfit())
-                    : "0 so‘m";
+            String profitText = MoneyFormatter.format(targetStats.netProfit());
 
             String successMsg = String.format("""
                     ✅ <b>Alohida xarajat saqlandi!</b>

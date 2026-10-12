@@ -119,29 +119,46 @@ public class DailyProfitService {
     public void deductFromProfit(User user, LocalDate date, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
         Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
-        if (profitOpt.isEmpty()) {
-            return;
-        }
-        DailyProfit p = profitOpt.get();
-        if (!p.isWorkDay()) {
-            return;
-        }
-        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
-        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+        if (profitOpt.isPresent()) {
+            DailyProfit p = profitOpt.get();
+            BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+            BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+            BigDecimal currentTotal = p.getTotalProfit() != null ? p.getTotalProfit() : currentCash.add(currentCard);
 
-        BigDecimal newCash = currentCash.subtract(amount);
-        BigDecimal newCard = currentCard;
-        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
-            BigDecimal deficit = newCash.abs();
-            newCash = BigDecimal.ZERO;
-            newCard = currentCard.subtract(deficit);
-            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
-                newCard = BigDecimal.ZERO;
+            if (currentCash.add(currentCard).compareTo(BigDecimal.ZERO) == 0 && currentTotal.compareTo(BigDecimal.ZERO) > 0) {
+                currentCash = currentTotal;
+            }
+
+            BigDecimal newCash = currentCash.subtract(amount);
+            BigDecimal newCard = currentCard;
+            if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+                BigDecimal deficit = newCash.abs();
+                newCash = BigDecimal.ZERO;
+                newCard = currentCard.subtract(deficit);
+            }
+            saveOrUpdateProfit(user, date, newCash, newCard);
+            log.info("Deducted {} from profit for user {} on {}: new total={}",
+                    amount, user.getId(), date, newCash.add(newCard));
+        } else {
+            // Profit record not found in daily_profits table (e.g. user entered profit via income transactions).
+            // Check if user has income on this date so we deduct from the daily income pool.
+            BigDecimal txIncome = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+            if (txIncome != null && txIncome.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal negativeDelta = BigDecimal.ZERO.subtract(amount);
+                DailyProfit p = DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .cashAmount(negativeDelta)
+                        .cardAmount(BigDecimal.ZERO)
+                        .totalProfit(negativeDelta)
+                        .isWorkDay(true)
+                        .build();
+                dailyProfitRepository.save(p);
+                balanceService.updateDailyProfitDelta(user, negativeDelta, BigDecimal.ZERO);
+                log.info("Deducted {} from income-based profit for user {} on {}: negative profit adjustment={}",
+                        amount, user.getId(), date, negativeDelta);
             }
         }
-        saveOrUpdateProfit(user, date, newCash, newCard);
-        log.info("Deducted {} from profit for user {} on {}: new total={}",
-                amount, user.getId(), date, newCash.add(newCard));
     }
 
     @Transactional
@@ -150,34 +167,50 @@ public class DailyProfitService {
             return getProfit(user.getId(), date).orElse(null);
         }
         Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
-        if (profitOpt.isEmpty()) {
+        if (profitOpt.isPresent()) {
+            DailyProfit p = profitOpt.get();
+            BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
+            BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
+            BigDecimal currentTotal = p.getTotalProfit() != null ? p.getTotalProfit() : currentCash.add(currentCard);
+
+            if (currentCash.add(currentCard).compareTo(BigDecimal.ZERO) == 0 && currentTotal.compareTo(BigDecimal.ZERO) > 0) {
+                currentCash = currentTotal;
+            }
+
+            BigDecimal newCash = currentCash.subtract(amount);
+            BigDecimal newCard = currentCard;
+            if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+                BigDecimal deficit = newCash.abs();
+                newCash = BigDecimal.ZERO;
+                newCard = currentCard.subtract(deficit);
+            }
+            p.setCashAmount(newCash);
+            p.setCardAmount(newCard);
+            p.setTotalProfit(newCash.add(newCard));
+            p.setWorkDay(true);
+            DailyProfit saved = dailyProfitRepository.save(p);
+            log.info("Deducted {} from profit ONLY (no balance double-delta) for user {} on {}: new total={}",
+                    amount, user.getId(), date, saved.getTotalProfit());
+            return saved;
+        } else {
+            BigDecimal txIncome = transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, date);
+            if (txIncome != null && txIncome.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal negativeDelta = BigDecimal.ZERO.subtract(amount);
+                DailyProfit p = DailyProfit.builder()
+                        .user(user)
+                        .profitDate(date)
+                        .cashAmount(negativeDelta)
+                        .cardAmount(BigDecimal.ZERO)
+                        .totalProfit(negativeDelta)
+                        .isWorkDay(true)
+                        .build();
+                DailyProfit saved = dailyProfitRepository.save(p);
+                log.info("Deducted {} from income-based profit ONLY for user {} on {}: negative adjustment={}",
+                        amount, user.getId(), date, negativeDelta);
+                return saved;
+            }
             return null;
         }
-        DailyProfit p = profitOpt.get();
-        if (!p.isWorkDay()) {
-            return p;
-        }
-        BigDecimal currentCash = p.getCashAmount() != null ? p.getCashAmount() : BigDecimal.ZERO;
-        BigDecimal currentCard = p.getCardAmount() != null ? p.getCardAmount() : BigDecimal.ZERO;
-
-        BigDecimal newCash = currentCash.subtract(amount);
-        BigDecimal newCard = currentCard;
-        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
-            BigDecimal deficit = newCash.abs();
-            newCash = BigDecimal.ZERO;
-            newCard = currentCard.subtract(deficit);
-            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
-                newCard = BigDecimal.ZERO;
-            }
-        }
-        p.setCashAmount(newCash);
-        p.setCardAmount(newCard);
-        p.setTotalProfit(newCash.add(newCard));
-        p.setWorkDay(true);
-        DailyProfit saved = dailyProfitRepository.save(p);
-        log.info("Deducted {} from profit ONLY (no balance double-delta) for user {} on {}: new total={}",
-                amount, user.getId(), date, saved.getTotalProfit());
-        return saved;
     }
 
     @Transactional

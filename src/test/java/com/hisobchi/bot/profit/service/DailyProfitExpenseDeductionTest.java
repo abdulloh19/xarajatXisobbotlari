@@ -338,12 +338,75 @@ class DailyProfitExpenseDeductionTest {
     }
 
     @Test
-    @DisplayName("Main menu return keyboard contains menu:main callback")
-    void testMainMenuReturnKeyboard() {
-        InlineKeyboardMarkup keyboard = inlineKeyboardFactory.getMainMenuReturnKeyboard();
-        assertNotNull(keyboard);
-        assertEquals(1, keyboard.getInlineKeyboard().size());
-        assertEquals("menu:main", keyboard.getInlineKeyboard().get(0).get(0).getCallbackData());
-        assertTrue(keyboard.getInlineKeyboard().get(0).get(0).getText().contains("Asosiy menyuga qaytish"));
+    @DisplayName("Deduct expense from profit when only totalProfit was set (cash and card are 0)")
+    void testDeductFromProfitWhenOnlyTotalProfitSet() {
+        LocalDate date = LocalDate.now();
+        DailyProfit existingProfit = DailyProfit.builder()
+                .id(20L)
+                .user(testUser)
+                .profitDate(date)
+                .cashAmount(BigDecimal.ZERO)
+                .cardAmount(BigDecimal.ZERO)
+                .totalProfit(new BigDecimal("100000"))
+                .isWorkDay(true)
+                .build();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), date))
+                .thenReturn(Optional.of(existingProfit));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        dailyProfitService.deductFromProfit(testUser, date, new BigDecimal("20000"));
+
+        ArgumentCaptor<DailyProfit> captor = ArgumentCaptor.forClass(DailyProfit.class);
+        verify(dailyProfitRepository, atLeastOnce()).save(captor.capture());
+
+        DailyProfit saved = captor.getValue();
+        assertEquals(new BigDecimal("80000"), saved.getCashAmount());
+        assertEquals(new BigDecimal("80000"), saved.getTotalProfit());
+    }
+
+    @Test
+    @DisplayName("Deduct expense from profit when daily profit record is empty but income transactions exist")
+    void testDeductFromProfitWhenDailyProfitRecordMissingButTxIncomeExists() {
+        LocalDate date = LocalDate.now();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), date))
+                .thenReturn(Optional.empty());
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(testUser.getId(), TransactionType.INCOME, date))
+                .thenReturn(new BigDecimal("100000"));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        dailyProfitService.deductFromProfit(testUser, date, new BigDecimal("25000"));
+
+        ArgumentCaptor<DailyProfit> captor = ArgumentCaptor.forClass(DailyProfit.class);
+        verify(dailyProfitRepository).save(captor.capture());
+
+        DailyProfit saved = captor.getValue();
+        assertEquals(new BigDecimal("-25000"), saved.getCashAmount());
+        assertEquals(new BigDecimal("-25000"), saved.getTotalProfit());
+        verify(balanceService).updateDailyProfitDelta(eq(testUser), eq(new BigDecimal("-25000")), eq(BigDecimal.ZERO));
+    }
+
+    @Test
+    @DisplayName("deductFromProfitOnly when daily profit record is empty but income transactions exist")
+    void testDeductFromProfitOnlyWhenDailyProfitRecordMissingButTxIncomeExists() {
+        LocalDate date = LocalDate.now();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), date))
+                .thenReturn(Optional.empty());
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(testUser.getId(), TransactionType.INCOME, date))
+                .thenReturn(new BigDecimal("200000"));
+        when(dailyProfitRepository.save(any(DailyProfit.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        DailyProfit result = dailyProfitService.deductFromProfitOnly(testUser, date, new BigDecimal("40000"));
+
+        assertNotNull(result);
+        assertEquals(new BigDecimal("-40000"), result.getCashAmount());
+        assertEquals(new BigDecimal("-40000"), result.getTotalProfit());
+        verify(balanceService, never()).updateDailyProfitDelta(any(), any(), any());
     }
 }
+

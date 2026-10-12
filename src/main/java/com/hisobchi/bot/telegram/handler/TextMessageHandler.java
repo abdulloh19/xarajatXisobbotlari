@@ -1390,6 +1390,11 @@ public class TextMessageHandler {
             }
         }
 
+        // 1.5 Check if user replies with text to a pending expense draft confirmation (e.g. "foydadan minus", "ha", "alohida", "yoq")
+        if (handlePendingDraftExpenseReply(user, chatId, trimmed)) {
+            return;
+        }
+
         // Quick natural commands for profit adjustments and profit expenses
         if (handleQuickProfitCommand(user, chatId, text)) {
             return;
@@ -1477,6 +1482,67 @@ public class TextMessageHandler {
         userActiveDebtDraftId.put(userId, draftId);
     }
 
+    private boolean handlePendingDraftExpenseReply(User user, Long chatId, String text) {
+        if (text == null || text.isBlank()) return false;
+        String lower = text.toLowerCase().trim()
+                .replace("’", "'").replace("‘", "'").replace("`", "'");
+
+        boolean isDeduct = lower.equals("ha") || lower.equals("ha foydadan minus") || lower.equals("foydadan minus")
+                || lower.equals("foydadan minus qil") || lower.equals("foydadan ayir") || lower.equals("foydadan ayrilsin")
+                || lower.equals("ha foydadan") || lower.equals("foydadan") || lower.equals("ha, foydadan minus");
+
+        boolean isSeparate = lower.equals("yoq") || lower.equals("yo'q") || lower.equals("alohida")
+                || lower.equals("alohida xarajat") || lower.equals("foydadan minus qilinmasin") || lower.equals("foydadan ayirma")
+                || lower.equals("yoq alohida") || lower.equals("yo'q alohida") || lower.equals("yo'q, alohida");
+
+        if (!isDeduct && !isSeparate) {
+            return false;
+        }
+
+        Optional<TransactionDraft> pendingOpt = draftService.getLatestPendingDraft(user.getId());
+        if (pendingOpt.isEmpty()) {
+            return false;
+        }
+
+        TransactionDraft draft = pendingOpt.get();
+        if (draft.getType() != TransactionType.EXPENSE) {
+            return false;
+        }
+
+        LocalDate today = DateTimeUtils.today(user.getTimezone());
+        TransactionDto saved = transactionService.confirmAndSaveWithDate(draft.getId(), user.getId(), today);
+
+        if (isDeduct) {
+            dailyProfitService.deductFromProfit(user, today, saved.amount());
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
+            String successMsg = BotMessageBuilder.buildSaveSuccessMessageWithSource(
+                    saved, false, "Bugungi", targetStats.totalExpense(), targetStats.totalIncome(), targetStats.netProfit());
+            apiClient.sendMessage(chatId, successMsg, inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+        } else {
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
+            String successMsg = String.format("""
+                    ✅ <b>Alohida xarajat saqlandi!</b>
+
+                    💸 <b>%s</b>
+                    📌 %s
+                    ━━━━━━━━━━━━━━━━━━
+                    💰 <b>Bugungi umumiy topilgan pul:</b> <b>%s</b> (+%s qo‘shildi)
+                    💸 <b>Bugungi umumiy xarajatlar:</b> <b>%s</b>
+                    ✅ <b>Bugungi foyda (o‘zgarishsiz):</b> <b>%s</b>
+                    """,
+                    MoneyFormatter.format(saved.amount()),
+                    saved.getCategoryDisplayName(),
+                    MoneyFormatter.format(targetStats.totalIncome()),
+                    MoneyFormatter.format(saved.amount()),
+                    MoneyFormatter.format(targetStats.totalExpense()),
+                    MoneyFormatter.format(targetStats.netProfit())
+            );
+            apiClient.sendMessage(chatId, successMsg, inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+        }
+        userService.updateState(user.getTelegramId(), UserState.IDLE);
+        return true;
+    }
+
     public boolean handleQuickProfitCommand(User user, Long chatId, String text) {
         if (text == null || text.isBlank()) {
             return false;
@@ -1494,8 +1560,10 @@ public class TextMessageHandler {
             return true;
         }
 
-        // Case 1: Expense deducted from today's profit (e.g. "bugungi foydadan 10 min xarajatga qoshib qoy", "foydadan 20 ming xarajat")
-        if (lowerText.contains("xarajat") || lowerText.contains("qarajat")) {
+        // Case 1: Expense deducted from today's profit (e.g. "bugungi foydadan 10 min xarajatga qoshib qoy", "foydadan 20 ming xarajat", "harajat qoshib foydadan minus qil 50000")
+        boolean isExpenseContext = lowerText.contains("xarajat") || lowerText.contains("qarajat") || lowerText.contains("harajat")
+                || categoryMatcher.matchCategory(text, TransactionType.EXPENSE).isPresent();
+        if (isExpenseContext) {
             Optional<BigDecimal> amtOpt = amountParser.parse(text);
             if (amtOpt.isPresent() && amtOpt.get().compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal amount = amtOpt.get();
@@ -1535,9 +1603,7 @@ public class TextMessageHandler {
                         ? (saved.getCategory().getEmoji() != null ? saved.getCategory().getEmoji() + " " : "") + saved.getCategory().getName()
                         : "Xarajat";
 
-                BigDecimal todayProfitVal = (updatedProfit != null && updatedProfit.getTotalProfit() != null)
-                        ? updatedProfit.getTotalProfit()
-                        : dailyProfitService.getTodayProfitOrIncome(user, today);
+                BigDecimal todayProfitVal = stats.netProfit();
                 BigDecimal cashVal = updatedProfit != null ? updatedProfit.getCashAmount() : todayProfitVal;
                 BigDecimal cardVal = updatedProfit != null ? updatedProfit.getCardAmount() : BigDecimal.ZERO;
 
