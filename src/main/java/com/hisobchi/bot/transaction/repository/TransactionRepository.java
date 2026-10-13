@@ -5,6 +5,7 @@ import com.hisobchi.bot.transaction.entity.Transaction;
 import com.hisobchi.bot.transaction.entity.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,7 @@ import java.util.Optional;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
+    @EntityGraph(attributePaths = {"category"})
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
@@ -89,16 +91,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
+    @EntityGraph(attributePaths = {"category"})
     List<Transaction> findByUserIdAndTransactionDateOrderByCreatedAtAsc(Long userId, LocalDate date);
 
+    @EntityGraph(attributePaths = {"category"})
     List<Transaction> findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(Long userId, TransactionType type, LocalDate date);
 
+    @EntityGraph(attributePaths = {"category"})
     List<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
             Long userId, LocalDate startDate, LocalDate endDate);
 
+    @EntityGraph(attributePaths = {"category"})
     Page<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
             Long userId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"category"})
     Page<Transaction> findByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId, Pageable pageable);
 
     @Query("SELECT DISTINCT t.transactionDate FROM Transaction t " +

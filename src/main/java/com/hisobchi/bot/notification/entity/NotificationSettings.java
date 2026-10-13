@@ -59,7 +59,7 @@ public class NotificationSettings {
 
     @Column(name = "quiet_hours_enabled", nullable = false)
     @Builder.Default
-    private Boolean quietHoursEnabled = true;
+    private Boolean quietHoursEnabled = false;
 
     @Column(name = "quiet_hours_start", nullable = false, length = 10)
     @Builder.Default

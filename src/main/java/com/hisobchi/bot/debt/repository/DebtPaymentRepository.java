@@ -18,14 +18,14 @@ public interface DebtPaymentRepository extends JpaRepository<DebtPayment, Long> 
 
     List<DebtPayment> findByUserIdAndPaymentDate(Long userId, LocalDate paymentDate);
 
-    @Query("SELECT dp FROM DebtPayment dp " +
+    @Query("SELECT dp FROM DebtPayment dp LEFT JOIN FETCH dp.debt " +
            "WHERE dp.user.id = :userId AND dp.paymentDate = :date " +
            "ORDER BY dp.createdAt ASC")
     List<DebtPayment> findByUserIdAndPaymentDateOrderByCreatedAtAsc(
             @Param("userId") Long userId,
             @Param("date") LocalDate date);
 
-    @Query("SELECT dp FROM DebtPayment dp " +
+    @Query("SELECT dp FROM DebtPayment dp LEFT JOIN FETCH dp.debt " +
            "WHERE dp.user.id = :userId AND dp.paymentDate BETWEEN :start AND :end " +
            "ORDER BY dp.createdAt DESC")
     List<DebtPayment> findByUserIdAndPaymentDateBetweenOrderByCreatedAtDesc(

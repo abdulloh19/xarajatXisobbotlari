@@ -64,29 +64,43 @@ public class TodoReminderService {
 
         NotificationSettings settings = settingsService.getOrCreateSettings(user);
 
-        // 1. Quiet Hours check
+        List<TodoTask> tasksToDeliver = new ArrayList<>();
+
+        // 1. Quiet Hours check:
+        // Tasks with an explicit specific time set by the user should NOT be postponed by quiet hours.
+        // Quiet hours should only postpone tasks without a specific time (e.g., date-only tasks or overdue backlog).
         if (Boolean.TRUE.equals(settings.getQuietHoursEnabled())) {
             LocalTime start = parseTime(settings.getQuietHoursStart(), LocalTime.of(23, 0));
             LocalTime end = parseTime(settings.getQuietHoursEnd(), LocalTime.of(7, 0));
 
             if (isInQuietHours(userTime, start, end)) {
-                // Postpone reminders until quiet hours end
                 LocalDate targetDate = (userTime.isAfter(start) || userTime.equals(start)) ? userNow.toLocalDate().plusDays(1) : userNow.toLocalDate();
                 Instant resumeInstant = targetDate.atTime(end).atZone(zoneId).toInstant();
 
                 for (TodoTask task : tasks) {
-                    task.setReminderAt(resumeInstant);
-                    taskRepository.save(task);
+                    if (Boolean.TRUE.equals(task.getHasSpecificTime())) {
+                        tasksToDeliver.add(task);
+                    } else {
+                        task.setReminderAt(resumeInstant);
+                        taskRepository.save(task);
+                        log.debug("Postponed general task {} for user {} due to quiet hours until {}", task.getId(), user.getId(), resumeInstant);
+                    }
                 }
-                log.debug("Postponed {} reminders for user {} due to quiet hours until {}", tasks.size(), user.getId(), resumeInstant);
-                return;
+            } else {
+                tasksToDeliver.addAll(tasks);
             }
+        } else {
+            tasksToDeliver.addAll(tasks);
+        }
+
+        if (tasksToDeliver.isEmpty()) {
+            return;
         }
 
         // 2. Downtime Aggregation: If user has > 3 overdue reminders, send aggregated summary
-        if (tasks.size() > 3) {
-            sendAggregatedReminder(user, tasks);
-            for (TodoTask t : tasks) {
+        if (tasksToDeliver.size() > 3) {
+            sendAggregatedReminder(user, tasksToDeliver);
+            for (TodoTask t : tasksToDeliver) {
                 t.setReminderAt(null);
                 taskRepository.save(t);
                 logDelivery(t, user, "DELIVERED_AGGREGATED", null);
@@ -95,7 +109,7 @@ public class TodoReminderService {
         }
 
         // 3. Otherwise send individual reminder cards
-        for (TodoTask task : tasks) {
+        for (TodoTask task : tasksToDeliver) {
             try {
                 sendSingleReminder(user, task);
                 task.setReminderAt(null);

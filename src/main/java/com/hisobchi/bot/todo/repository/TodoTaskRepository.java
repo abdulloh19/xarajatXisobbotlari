@@ -60,7 +60,7 @@ public interface TodoTaskRepository extends JpaRepository<TodoTask, Long> {
             @Param("end") LocalDate end,
             @Param("statuses") Collection<TodoStatus> statuses);
 
-    @Query("SELECT t FROM TodoTask t WHERE t.reminderAt <= :now AND t.status IN ('OPEN', 'IN_PROGRESS') ORDER BY t.reminderAt ASC")
+    @Query("SELECT t FROM TodoTask t LEFT JOIN FETCH t.user LEFT JOIN FETCH t.project LEFT JOIN FETCH t.category WHERE t.reminderAt <= :now AND t.status IN ('OPEN', 'IN_PROGRESS') ORDER BY t.reminderAt ASC")
     List<TodoTask> findDueReminders(@Param("now") Instant now);
 
     @Query("SELECT t FROM TodoTask t WHERE t.user.id = :userId AND LOWER(t.title) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY t.dueDate ASC")

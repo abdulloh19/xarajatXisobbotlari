@@ -50,6 +50,7 @@ import com.hisobchi.bot.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -1740,6 +1741,7 @@ public class TextMessageHandler {
         apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDraftConfirmationKeyboard(draft.getId(), draft.getType(), isOffDay, lastWorkText, hasEnteredProfitToday), "HTML");
     }
 
+    @Transactional(readOnly = true)
     private void sendDayHistory(Long chatId, User user, LocalDate date, String label) {
         List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), date);
         List<Debt> debts = debtRepository != null
@@ -1755,6 +1757,7 @@ public class TextMessageHandler {
         apiClient.sendMessage(chatId, msg, markup, "HTML");
     }
 
+    @Transactional(readOnly = true)
     public void sendTodayExpensesList(Long chatId, User user) {
         LocalDate today = DateTimeUtils.today(user.getTimezone());
         List<Transaction> expenses = transactionRepository.findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(
@@ -1768,6 +1771,7 @@ public class TextMessageHandler {
         apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getExpensesListKeyboard(expenses, today), "HTML");
     }
 
+    @Transactional(readOnly = true)
     private void sendPeriodHistory(Long chatId, User user, LocalDate start, LocalDate end, String title) {
         List<Transaction> list = transactionRepository.findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
                 user.getId(), start, end);

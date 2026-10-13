@@ -39,6 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import com.hisobchi.bot.profit.entity.DailyProfit;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -127,6 +128,7 @@ public class CallbackQueryHandler {
         }
     }
 
+    @Transactional(readOnly = true)
     private void handleStatsCallback(User user, Long chatId, Integer messageId, String[] parts) {
         LocalDate today = DateTimeUtils.today(user.getTimezone());
         if (parts.length > 1 && "weekly".equals(parts[1])) {
@@ -1307,6 +1309,7 @@ public class CallbackQueryHandler {
         }
     }
 
+    @Transactional
     private void handleTransactionCallback(User user, Long chatId, Integer messageId, String[] parts) {
         String action = parts[1];
 
