@@ -1391,7 +1391,7 @@ public class TextMessageHandler {
         }
 
         // 1.5 Check if user replies with text to a pending expense draft confirmation (e.g. "foydadan minus", "ha", "alohida", "yoq")
-        if (handlePendingDraftExpenseReply(user, chatId, trimmed)) {
+        if (handlePendingDraftExpenseReply(user, chatId, text != null ? text.trim() : "")) {
             return;
         }
 

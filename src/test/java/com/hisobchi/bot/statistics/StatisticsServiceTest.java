@@ -277,4 +277,39 @@ class StatisticsServiceTest {
         assertEquals(new BigDecimal("600000"), stats.totalIncome());
         assertEquals(2, stats.incomeCategories().size());
     }
+
+    @Test
+    @DisplayName("DailyStatistics when expense is deducted from income-based profit: 170k income - 50k expense -> totalEarned remains 170k, netProfit becomes 120k")
+    void testDailyStatisticsWhenExpenseDeductedFromIncome() {
+        User user = User.builder().id(1L).build();
+        LocalDate today = LocalDate.of(2026, 10, 13);
+
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.EXPENSE, today))
+                .thenReturn(new BigDecimal("50000"));
+        when(transactionRepository.sumAmountByUserIdAndTypeAndDate(user.getId(), TransactionType.INCOME, today))
+                .thenReturn(new BigDecimal("170000"));
+
+        DailyProfit deductedProfit = DailyProfit.builder()
+                .profitDate(today)
+                .totalProfit(new BigDecimal("-50000"))
+                .cashAmount(new BigDecimal("-50000"))
+                .cardAmount(BigDecimal.ZERO)
+                .isWorkDay(true)
+                .build();
+        when(dailyProfitService.getProfit(user.getId(), today)).thenReturn(Optional.of(deductedProfit));
+        when(transactionRepository.countByUserIdAndDate(user.getId(), today)).thenReturn(2L);
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.EXPENSE, today)).thenReturn(List.of(
+                new CategoryExpenseDto(1L, "Uy", "🏠", new BigDecimal("50000"), 1L)
+        ));
+        when(transactionRepository.findCategoryExpensesByDate(user.getId(), TransactionType.INCOME, today)).thenReturn(List.of(
+                new CategoryExpenseDto(2L, "Taxi", "🚕", new BigDecimal("170000"), 1L)
+        ));
+        when(dailySummaryService.isDayClosed(user.getId(), today)).thenReturn(false);
+
+        DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+
+        assertEquals(new BigDecimal("170000"), stats.totalIncome(), "totalEarned 170 000 bo'lib qolishi kerak (220 000 emas)");
+        assertEquals(new BigDecimal("50000"), stats.totalExpense(), "totalExpense 50 000 bo'lishi kerak");
+        assertEquals(new BigDecimal("120000"), stats.netProfit(), "netProfit 120 000 bo'lishi kerak (170 000 emas)");
+    }
 }
