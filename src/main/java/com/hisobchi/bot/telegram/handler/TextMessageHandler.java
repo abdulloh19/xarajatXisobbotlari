@@ -206,6 +206,8 @@ public class TextMessageHandler {
                  "📆 Oxirgi 21 kun", "📅 Oxirgi 21 kun", "Oxirgi 21 kun",
                  "🗓 O‘tgan oy", "🗓 O'tgan oy", "📅 O‘tgan oy", "📅 O'tgan oy", "O‘tgan oy", "O'tgan oy",
                  "🗓 Shu oy", "📅 Shu oy", "Shu oy",
+                 "🧾 Bugungi xarajatlar", "Bugungi xarajatlar", "Xarajatlar", "Xarajatlarim",
+                 "Xarajatlarni o‘chirish", "Xarajatlarni o'chirish", "Xarajatlarni ochirish",
                  "✅ Vazifalar", "Vazifalar", "📁 Loyihalar", "Loyihalar",
                  "⬅️ Orqaga", "⬅️ Asosiy menyu", "🏠 Asosiy menyu" -> true;
             default -> false;
@@ -237,6 +239,22 @@ public class TextMessageHandler {
         } else if (user.getState() != null && user.getState() != UserState.IDLE) {
             // 2. Route based on User State (if in an interactive input flow)
             handleStateInput(user, chatId, trimmed);
+            return;
+        }
+
+        // 2.1 Check if user requested today's expenses list or to delete expenses
+        String lowerText = trimmed.toLowerCase();
+        boolean isExpenseListOrDelete = lowerText.equals("xarajatlar") || lowerText.equals("xarajatlarim")
+                || lowerText.equals("🧾 bugungi xarajatlar") || lowerText.equals("bugungi xarajatlar")
+                || lowerText.equals("xarajatlar ro'yxati") || lowerText.equals("xarajatlar ro‘yxati") || lowerText.equals("xarajatlar royxati")
+                || lowerText.contains("xarajatlarni ko'r") || lowerText.contains("xarajatlarni ko‘r") || lowerText.contains("xarajatlarni kor")
+                || lowerText.contains("xarajatlarni o'chir") || lowerText.contains("xarajatlarni o‘chir") || lowerText.contains("xarajatlarni ochir")
+                || lowerText.contains("xarajatni o'chir") || lowerText.contains("xarajatni o‘chir") || lowerText.contains("xarajatni ochir")
+                || lowerText.contains("bugungi xarajatlarni ochir") || lowerText.contains("bugungi xarajatlarni o'chir") || lowerText.contains("bugungi xarajatlarni o‘chir")
+                || lowerText.contains("qoshilgan xarajat") || lowerText.contains("qo'shilgan xarajat") || lowerText.contains("qo‘shilgan xarajat");
+
+        if (isExpenseListOrDelete && amountParser.parse(trimmed).isEmpty()) {
+            sendTodayExpensesList(chatId, user);
             return;
         }
 
@@ -1519,6 +1537,11 @@ public class TextMessageHandler {
                     saved, false, "Bugungi", targetStats.totalExpense(), targetStats.totalIncome(), targetStats.netProfit());
             apiClient.sendMessage(chatId, successMsg, inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
         } else {
+            Transaction tx = transactionService.getByIdAndUser(saved.id(), user.getId());
+            String existingDesc = tx.getDescription();
+            tx.setDescription(existingDesc != null && !existingDesc.isBlank() ? existingDesc + " [Alohida]" : "[Alohida]");
+            transactionRepository.save(tx);
+
             DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
             String successMsg = String.format("""
                     ✅ <b>Alohida xarajat saqlandi!</b>
@@ -1730,6 +1753,19 @@ public class TextMessageHandler {
         String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(date, list, debts, payments, profit, user.getTimezone());
         var markup = inlineKeyboardFactory.getDailyOperationsKeyboard(list, debts, date);
         apiClient.sendMessage(chatId, msg, markup, "HTML");
+    }
+
+    public void sendTodayExpensesList(Long chatId, User user) {
+        LocalDate today = DateTimeUtils.today(user.getTimezone());
+        List<Transaction> expenses = transactionRepository.findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(
+                user.getId(), TransactionType.EXPENSE, today);
+        if (expenses.isEmpty()) {
+            apiClient.sendMessage(chatId, "ℹ️ <b>Bugun hali hech qanday xarajat kiritilmagan.</b>",
+                    replyKeyboardFactory.getMainMenu(), "HTML");
+            return;
+        }
+        String msg = BotMessageBuilder.buildExpensesListMessage(today, expenses, user.getTimezone());
+        apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getExpensesListKeyboard(expenses, today), "HTML");
     }
 
     private void sendPeriodHistory(Long chatId, User user, LocalDate start, LocalDate end, String title) {

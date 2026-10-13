@@ -97,6 +97,16 @@ public class VoiceMessageHandler {
             return;
         }
 
+        // Voice command for today's expenses list / delete expenses
+        boolean isExpenseListOrDeleteVoice = lowerVoice.equals("xarajatlar") || lowerVoice.equals("xarajatlarim")
+                || lowerVoice.contains("bugungi xarajat") || lowerVoice.contains("xarajatlarni ko") || lowerVoice.contains("xarajatlarni kor")
+                || lowerVoice.contains("xarajatlarni ochir") || lowerVoice.contains("xarajatlarni o'chir") || lowerVoice.contains("xarajatlarni o‘chir")
+                || lowerVoice.contains("qoshilgan xarajat") || lowerVoice.contains("qo'shilgan xarajat");
+        if (isExpenseListOrDeleteVoice && result.parsedTransaction().isEmpty()) {
+            textMessageHandler.sendTodayExpensesList(chatId, user);
+            return;
+        }
+
         Optional<ParsedTransaction> parsedOpt = result.parsedTransaction();
 
         if (parsedOpt.isEmpty()) {

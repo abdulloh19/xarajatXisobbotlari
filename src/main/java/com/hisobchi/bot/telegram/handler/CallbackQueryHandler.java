@@ -1217,6 +1217,11 @@ public class CallbackQueryHandler {
             LocalDate today = DateTimeUtils.today(user.getTimezone());
             TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), today);
 
+            Transaction tx = transactionService.getByIdAndUser(saved.id(), user.getId());
+            String existingDesc = tx.getDescription();
+            tx.setDescription(existingDesc != null && !existingDesc.isBlank() ? existingDesc + " [Alohida]" : "[Alohida]");
+            transactionRepository.save(tx);
+
             // Alohida xarajat: Kunlik foydadan ayirilmaydi (foydaga tegilmaydi).
             DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
             String profitText = MoneyFormatter.format(targetStats.netProfit());
@@ -1305,6 +1310,38 @@ public class CallbackQueryHandler {
     private void handleTransactionCallback(User user, Long chatId, Integer messageId, String[] parts) {
         String action = parts[1];
 
+        if ("add_expense".equals(action)) {
+            userService.updateState(user.getTelegramId(), UserState.WAITING_EXPENSE_AMOUNT);
+            String prompt = """
+                    💵 <b>Xarajat miqdorini kiriting:</b>
+
+                    Masalan:
+                    <code>15000</code>
+                    yoki
+                    <code>15 ming</code>
+                    """;
+            apiClient.sendMessage(chatId, prompt, replyKeyboardFactory.getCancelMenu(), "HTML");
+            return;
+        }
+
+        if ("list_expenses_today".equals(action) || "list_expenses_date".equals(action)) {
+            LocalDate date = ("list_expenses_date".equals(action) && parts.length > 2)
+                    ? LocalDate.parse(parts[2])
+                    : DateTimeUtils.today(user.getTimezone());
+            List<Transaction> expenses = transactionRepository.findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(
+                    user.getId(), TransactionType.EXPENSE, date);
+            if (expenses.isEmpty()) {
+                apiClient.editMessageText(chatId, messageId,
+                        "ℹ️ <b>" + DateTimeUtils.formatUzbekDate(date) + "</b> kuni kiritilgan xarajatlar mavjud emas.",
+                        inlineKeyboardFactory.getMainMenuReturnKeyboard(), "HTML");
+                return;
+            }
+            String msg = BotMessageBuilder.buildExpensesListMessage(date, expenses, user.getTimezone());
+            apiClient.editMessageText(chatId, messageId, msg,
+                    inlineKeyboardFactory.getExpensesListKeyboard(expenses, date), "HTML");
+            return;
+        }
+
         if ("list_today".equals(action) || "list_date".equals(action)) {
             LocalDate date = ("list_date".equals(action) && parts.length > 2)
                     ? LocalDate.parse(parts[2])
@@ -1333,17 +1370,58 @@ public class CallbackQueryHandler {
                         inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, tx.getTransactionDate()), "HTML");
             }
             case "delete_ask" -> {
-                apiClient.editMessageText(chatId, messageId,
-                        "⚠️ <b>Ushbu operatsiyani o‘chirmoqchimisiz?</b>",
+                Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : (tx.getType() == TransactionType.EXPENSE ? "💸" : "💰");
+                String catName = tx.getCategory() != null ? tx.getCategory().getName() : "Boshqa";
+                String typeName = tx.getType() == TransactionType.EXPENSE ? "xarajat" : "daromad";
+                String prompt = String.format("""
+                        ⚠️ <b>Ushbu %sni o‘chirmoqchimisiz?</b>
+
+                        %s <b>%s:</b> <b>%s</b>
+                        📂 <b>Kategoriya:</b> %s
+                        📅 <b>Sana:</b> %s
+                        """,
+                        typeName,
+                        emoji,
+                        typeName.substring(0, 1).toUpperCase() + typeName.substring(1),
+                        MoneyFormatter.format(tx.getAmount()),
+                        catName,
+                        DateTimeUtils.formatUzbekDate(tx.getTransactionDate())
+                );
+                apiClient.editMessageText(chatId, messageId, prompt,
                         inlineKeyboardFactory.getDeleteConfirmationKeyboard(txId), "HTML");
             }
             case "delete_confirm" -> {
                 Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
                 LocalDate txDate = tx.getTransactionDate();
+                boolean isExpense = tx.getType() == TransactionType.EXPENSE;
+                BigDecimal amount = tx.getAmount();
+                boolean isAlohida = tx.getDescription() != null && tx.getDescription().contains("[Alohida]");
+
                 transactionService.deleteTransaction(txId, user.getId());
-                List<Transaction> remaining = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), txDate);
-                apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>",
-                        inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
+
+                if (isExpense) {
+                    if (!isAlohida) {
+                        dailyProfitService.addToProfit(user, txDate, amount);
+                    }
+                    List<Transaction> remainingExpenses = transactionRepository.findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(
+                            user.getId(), TransactionType.EXPENSE, txDate);
+                    String header = "🗑 <b>Xarajat muvaffaqiyatli o‘chirildi!</b>\n\n💸 <b>O‘chirilgan summa:</b> " + MoneyFormatter.format(amount) + "\n\n";
+                    if (remainingExpenses.isEmpty()) {
+                        header += "ℹ️ Ushbu kunda boshqa xarajatlar qolmadi.";
+                        apiClient.editMessageText(chatId, messageId, header,
+                                inlineKeyboardFactory.getMainMenuReturnKeyboard(), "HTML");
+                    } else {
+                        String listMsg = BotMessageBuilder.buildExpensesListMessage(txDate, remainingExpenses, user.getTimezone());
+                        apiClient.editMessageText(chatId, messageId, header + listMsg,
+                                inlineKeyboardFactory.getExpensesListKeyboard(remainingExpenses, txDate), "HTML");
+                    }
+                } else {
+                    List<Transaction> remaining = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), txDate);
+                    apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>",
+                            inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
+                }
             }
             case "delete_cancel" -> {
                 Transaction tx = transactionService.getByIdAndUser(txId, user.getId());

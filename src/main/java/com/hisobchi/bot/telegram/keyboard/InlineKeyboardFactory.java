@@ -292,10 +292,36 @@ public class InlineKeyboardFactory {
                                 new InlineKeyboardButton("✏️ Tahrirlash", "tx:detail:" + transactionId)
                         ),
                         List.of(
+                                new InlineKeyboardButton("🗑 O‘chirish", "tx:delete_ask:" + transactionId),
+                                new InlineKeyboardButton("🧾 Bugungi xarajatlar", "tx:list_expenses_today")
+                        ),
+                        List.of(
                                 new InlineKeyboardButton("🏠 Asosiy menyuga qaytish", "menu:main")
                         )
                 ))
                 .build();
+    }
+
+    public InlineKeyboardMarkup getExpensesListKeyboard(List<Transaction> expenses, LocalDate date) {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        if (expenses != null) {
+            int idx = 1;
+            for (Transaction tx : expenses) {
+                String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                        ? tx.getCategory().getEmoji() : "📌";
+                String name = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+                String label = idx++ + ". " + emoji + " " + name + " (" + MoneyFormatter.format(tx.getAmount()) + ")";
+                rows.add(List.of(
+                        new InlineKeyboardButton(label, "tx:detail:" + tx.getId()),
+                        new InlineKeyboardButton("🗑 O‘chirish", "tx:delete_ask:" + tx.getId())
+                ));
+            }
+        }
+        rows.add(List.of(
+                new InlineKeyboardButton("➕ Yangi xarajat", "tx:add_expense"),
+                new InlineKeyboardButton("🏠 Asosiy menyu", "menu:main")
+        ));
+        return InlineKeyboardMarkup.builder().inlineKeyboard(rows).build();
     }
 
     public InlineKeyboardMarkup getMainMenuReturnKeyboard() {
@@ -331,7 +357,8 @@ public class InlineKeyboardFactory {
                 String prefix = tx.getType() == TransactionType.INCOME ? "+" : "-";
                 String label = emoji + " " + name + " (" + prefix + MoneyFormatter.format(tx.getAmount()) + ")";
                 rows.add(List.of(
-                        new InlineKeyboardButton(label, "tx:detail:" + tx.getId())
+                        new InlineKeyboardButton(label, "tx:detail:" + tx.getId()),
+                        new InlineKeyboardButton("🗑", "tx:delete_ask:" + tx.getId())
                 ));
             }
         }
@@ -396,12 +423,12 @@ public class InlineKeyboardFactory {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("🧾 Operatsiyalarni ko‘rish / tahrirlash", "tx:list_date:" + date),
+                                new InlineKeyboardButton("🧾 Operatsiyalarni ko‘rish", "tx:list_date:" + date),
                                 new InlineKeyboardButton("💵 Foydani o‘zgartirish", "profit:enter:" + date)
                         ),
                         List.of(
-                                new InlineKeyboardButton("📅 Haftalik", "stats:weekly"),
-                                new InlineKeyboardButton("🗓 Oylik", "stats:monthly")
+                                new InlineKeyboardButton("💸 Bugungi xarajatlar", "tx:list_expenses_date:" + date),
+                                new InlineKeyboardButton("📅 Haftalik", "stats:weekly")
                         )
                 ))
                 .build();

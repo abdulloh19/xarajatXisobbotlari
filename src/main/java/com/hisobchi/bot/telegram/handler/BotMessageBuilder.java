@@ -384,7 +384,10 @@ public final class BotMessageBuilder {
                 sb.append("<b>").append(sign).append(MoneyFormatter.format(tx.getAmount())).append("</b>\n");
                 sb.append("   ⏱ <i>").append(timeStr).append("</i>");
                 if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
-                    sb.append(" • <i>").append(escapeHtml(tx.getDescription())).append("</i>");
+                    String cleanDesc = tx.getDescription().replace("[Alohida]", "").trim();
+                    if (!cleanDesc.isBlank()) {
+                        sb.append(" • <i>").append(escapeHtml(cleanDesc)).append("</i>");
+                    }
                 }
                 sb.append("\n");
             }
@@ -575,11 +578,47 @@ public final class BotMessageBuilder {
         sb.append("📂 Kategoriya: <b>").append(tx.getCategoryDisplayName()).append("</b>\n");
 
         if (tx.description() != null && !tx.description().isBlank()) {
-            sb.append("📝 Izoh: ").append(escapeHtml(tx.description())).append("\n");
+            String cleanDesc = tx.description().replace("[Alohida]", "").trim();
+            if (!cleanDesc.isBlank()) {
+                sb.append("📝 Izoh: ").append(escapeHtml(cleanDesc)).append("\n");
+            }
         }
 
         sb.append("📅 Sana: ").append(DateTimeUtils.formatDate(tx.transactionDate())).append("\n");
         sb.append("⏱ Yozilgan vaqti: ").append(DateTimeUtils.formatDateTime(tx.createdAt(), timezone)).append("\n");
+        return sb.toString();
+    }
+
+    public static String buildExpensesListMessage(LocalDate date, List<Transaction> expenses, String timezone) {
+        if (expenses == null || expenses.isEmpty()) {
+            return "ℹ️ <b>" + DateTimeUtils.formatUzbekDate(date) + "</b> kuni kiritilgan xarajatlar mavjud emas.";
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        StringBuilder sb = new StringBuilder();
+        sb.append("🧾 <b>").append(DateTimeUtils.formatUzbekDate(date).toUpperCase()).append(" KUNGI QO‘SHILGAN XARAJATLAR:</b>\n");
+        sb.append("━━━━━━━━━━━━━━━━━━\n\n");
+        int idx = 1;
+        for (Transaction tx : expenses) {
+            String emoji = (tx.getCategory() != null && tx.getCategory().getEmoji() != null)
+                    ? tx.getCategory().getEmoji() : "📌";
+            String catName = (tx.getCategory() != null) ? tx.getCategory().getName() : "Boshqa";
+            String timeStr = DateTimeUtils.formatTime(tx.getCreatedAt(), timezone);
+            total = total.add(tx.getAmount());
+
+            sb.append(idx++).append(". ").append(emoji).append(" <b>").append(escapeHtml(catName)).append("</b>: ");
+            sb.append("<b>-").append(MoneyFormatter.format(tx.getAmount())).append("</b>\n");
+            sb.append("   ⏱ <i>").append(timeStr).append("</i>");
+            if (tx.getDescription() != null && !tx.getDescription().isBlank()) {
+                String cleanDesc = tx.getDescription().replace("[Alohida]", "").trim();
+                if (!cleanDesc.isBlank()) {
+                    sb.append(" • <i>").append(escapeHtml(cleanDesc)).append("</i>");
+                }
+            }
+            sb.append("\n\n");
+        }
+        sb.append("━━━━━━━━━━━━━━━━━━\n");
+        sb.append("💸 <b>Jami xarajatlar:</b> <b>-").append(MoneyFormatter.format(total)).append("</b> (").append(expenses.size()).append(" ta)\n\n");
+        sb.append("<i>O‘chirish uchun kerakli xarajat yonidagi 🗑 tugmasini bosing:</i>");
         return sb.toString();
     }
 
