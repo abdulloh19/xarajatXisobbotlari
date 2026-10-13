@@ -55,7 +55,7 @@ public class NotificationSettings {
 
     @Column(name = "daily_report_time", nullable = false, length = 10)
     @Builder.Default
-    private String dailyReportTime = "23:00";
+    private String dailyReportTime = "23:59";
 
     @Column(name = "quiet_hours_enabled", nullable = false)
     @Builder.Default

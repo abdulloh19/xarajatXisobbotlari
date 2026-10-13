@@ -38,6 +38,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import com.hisobchi.bot.notification.entity.ReminderDeliveryLog;
+import com.hisobchi.bot.notification.entity.ReminderType;
+import com.hisobchi.bot.notification.repository.ReminderDeliveryLogRepository;
 import com.hisobchi.bot.profit.entity.DailyProfit;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +77,7 @@ public class CallbackQueryHandler {
     private final com.hisobchi.bot.profit.service.DailyProfitService dailyProfitService;
     private final com.hisobchi.bot.user.service.DataResetService dataResetService;
     private final com.hisobchi.bot.todo.handler.TodoCallbackHandler todoCallbackHandler;
+    private final ReminderDeliveryLogRepository deliveryLogRepository;
 
     public void handle(User user, CallbackQuery callback) {
         String data = callback.getData();
@@ -1011,8 +1015,27 @@ public class CallbackQueryHandler {
     }
 
     private void handleReminderCallback(User user, Long chatId, Integer messageId, String[] parts) {
-        if ("dismiss".equals(parts[1])) {
+        String action = parts.length > 1 ? parts[1] : "";
+        if ("dismiss".equals(action)) {
             apiClient.editMessageText(chatId, messageId, "⏰ Eslatma keyinroqqa qoldirildi.", null, null);
+        } else if ("confirm_profit".equals(action)) {
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), today);
+            String profitStr = profitOpt.map(p -> MoneyFormatter.format(p.getTotalProfit())).orElse("0 so‘m");
+            String msg = String.format("""
+                    ✅ <b>Bugungi foyda tasdiqlandi: %s</b>
+
+                    🌙 Kunlik yakuniy hisobot soat <b>23:59</b> da taqdim etiladi.
+                    """, profitStr);
+            apiClient.editMessageText(chatId, messageId, msg, null, "HTML");
+
+            if (deliveryLogRepository != null && !deliveryLogRepository.existsByUserIdAndReminderTypeAndReminderDate(user.getId(), ReminderType.PROFIT_21, today)) {
+                deliveryLogRepository.save(ReminderDeliveryLog.builder()
+                        .user(user)
+                        .reminderType(ReminderType.PROFIT_21)
+                        .reminderDate(today)
+                        .build());
+            }
         }
     }
 

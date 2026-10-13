@@ -66,7 +66,7 @@ public class ReminderService {
         }
     }
 
-    private void sendReminder18IfEligible(User user, LocalDate today) {
+    void sendReminder18IfEligible(User user, LocalDate today) {
         if (deliveryLogRepository.existsByUserIdAndReminderTypeAndReminderDate(user.getId(), ReminderType.PROFIT_18, today)) {
             return;
         }
@@ -84,8 +84,11 @@ public class ReminderService {
             );
             keyboard = InlineKeyboardMarkup.builder()
                     .inlineKeyboard(List.of(
-                            List.of(InlineKeyboardButton.builder().text("✅ Yangilash").callbackData("profit:enter").build()),
-                            List.of(InlineKeyboardButton.builder().text("⏰ Keyinroq").callbackData("reminder:dismiss").build())
+                            List.of(InlineKeyboardButton.builder().text("✅ Bugungi foyda shu").callbackData("reminder:confirm_profit").build()),
+                            List.of(
+                                    InlineKeyboardButton.builder().text("🔄 Yangilash").callbackData("profit:enter").build(),
+                                    InlineKeyboardButton.builder().text("⏰ Keyinroq").callbackData("reminder:dismiss").build()
+                            )
                     ))
                     .build();
         } else {
@@ -116,6 +119,7 @@ public class ReminderService {
 
         Optional<DailyProfit> profitOpt = dailyProfitService.getProfit(user.getId(), today);
         String text;
+        InlineKeyboardMarkup keyboard;
 
         if (profitOpt.isPresent() && profitOpt.get().getTotalProfit() != null && profitOpt.get().getTotalProfit().compareTo(java.math.BigDecimal.ZERO) > 0) {
             text = String.format("""
@@ -127,6 +131,15 @@ public class ReminderService {
                     """,
                     MoneyFormatter.format(profitOpt.get().getTotalProfit())
             );
+            keyboard = InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(InlineKeyboardButton.builder().text("✅ Bugungi foyda shu").callbackData("reminder:confirm_profit").build()),
+                            List.of(
+                                    InlineKeyboardButton.builder().text("💵 Yangilash").callbackData("profit:enter").build(),
+                                    InlineKeyboardButton.builder().text("📊 Bugungi hisob").callbackData("report:daily").build()
+                            )
+                    ))
+                    .build();
         } else {
             text = """
                     🌙 <b>Kechki hisob-kitob:</b>
@@ -134,14 +147,13 @@ public class ReminderService {
                     Bugungi daromadingizni (foydangizni) kiriting!
                     Kunlik to‘liq hisobingiz chiqishi uchun daromad va qo‘lingizdagi foydani kiritishni unutmang.
                     """;
+            keyboard = InlineKeyboardMarkup.builder()
+                    .inlineKeyboard(List.of(
+                            List.of(InlineKeyboardButton.builder().text("💵 Daromadni / Foydani kiritish").callbackData("profit:enter").build()),
+                            List.of(InlineKeyboardButton.builder().text("📊 Bugungi hisob").callbackData("report:daily").build())
+                    ))
+                    .build();
         }
-
-        InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
-                .inlineKeyboard(List.of(
-                        List.of(InlineKeyboardButton.builder().text("💵 Daromadni / Foydani kiritish").callbackData("profit:enter").build()),
-                        List.of(InlineKeyboardButton.builder().text("📊 Bugungi hisob").callbackData("report:daily").build())
-                ))
-                .build();
 
         apiClient.sendMessage(user.getTelegramId(), text, keyboard, "HTML");
         deliveryLogRepository.save(ReminderDeliveryLog.builder()

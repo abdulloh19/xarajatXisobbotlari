@@ -28,7 +28,7 @@ public class NotificationSettingsService {
                                 .twoWeekReportEnabled(true)
                                 .threeWeekReportEnabled(true)
                                 .monthlyReportEnabled(true)
-                                .dailyReportTime("23:00")
+                                .dailyReportTime("23:59")
                                 .build()
                 ));
     }

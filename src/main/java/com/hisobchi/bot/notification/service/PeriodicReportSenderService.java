@@ -51,9 +51,9 @@ public class PeriodicReportSenderService {
 
         NotificationSettings settings = settingsService.getOrCreateSettings(user);
 
-        // 1. Daily Report at 23:00 (or user configured time)
+        // 1. Daily Report at 23:59 (or user configured time)
         if (Boolean.TRUE.equals(settings.getDailyReportEnabled())) {
-            String reportTime = settings.getDailyReportTime() != null ? settings.getDailyReportTime() : "23:00";
+            String reportTime = settings.getDailyReportTime() != null ? settings.getDailyReportTime() : "23:59";
             String[] parts = reportTime.split(":");
             int targetHour = Integer.parseInt(parts[0]);
             int targetMin = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
