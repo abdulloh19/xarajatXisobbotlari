@@ -20,7 +20,11 @@ import java.util.Optional;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
-    @EntityGraph(attributePaths = {"category"})
+    @Override
+    @EntityGraph(attributePaths = {"category", "user"})
+    Optional<Transaction> findById(Long id);
+
+    @EntityGraph(attributePaths = {"category", "user"})
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
@@ -91,21 +95,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
-    @EntityGraph(attributePaths = {"category"})
+    @EntityGraph(attributePaths = {"category", "user"})
     List<Transaction> findByUserIdAndTransactionDateOrderByCreatedAtAsc(Long userId, LocalDate date);
 
-    @EntityGraph(attributePaths = {"category"})
+    @EntityGraph(attributePaths = {"category", "user"})
     List<Transaction> findByUserIdAndTypeAndTransactionDateOrderByCreatedAtAsc(Long userId, TransactionType type, LocalDate date);
 
-    @EntityGraph(attributePaths = {"category"})
+    @EntityGraph(attributePaths = {"category", "user"})
     List<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
             Long userId, LocalDate startDate, LocalDate endDate);
 
-    @EntityGraph(attributePaths = {"category"})
+    @EntityGraph(attributePaths = {"category", "user"})
     Page<Transaction> findByUserIdAndTransactionDateBetweenOrderByTransactionDateDescCreatedAtDesc(
             Long userId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"category"})
+    @EntityGraph(attributePaths = {"category", "user"})
     Page<Transaction> findByUserIdOrderByTransactionDateDescCreatedAtDesc(Long userId, Pageable pageable);
 
     @Query("SELECT DISTINCT t.transactionDate FROM Transaction t " +

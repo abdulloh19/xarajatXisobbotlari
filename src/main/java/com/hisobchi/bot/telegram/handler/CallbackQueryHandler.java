@@ -50,6 +50,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class CallbackQueryHandler {
 
     private final TelegramApiClient apiClient;
@@ -1389,7 +1390,7 @@ public class CallbackQueryHandler {
                         emoji,
                         typeName.substring(0, 1).toUpperCase() + typeName.substring(1),
                         MoneyFormatter.format(tx.getAmount()),
-                        catName,
+                        BotMessageBuilder.escapeHtml(catName),
                         DateTimeUtils.formatUzbekDate(tx.getTransactionDate())
                 );
                 apiClient.editMessageText(chatId, messageId, prompt,
@@ -1422,16 +1423,25 @@ public class CallbackQueryHandler {
                     }
                 } else {
                     List<Transaction> remaining = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), txDate);
-                    apiClient.editMessageText(chatId, messageId, "🗑 <b>Operatsiya o‘chirildi.</b>",
-                            inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
+                    String header = "🗑 <b>Operatsiya muvaffaqiyatli o‘chirildi!</b>\n\n💰 <b>O‘chirilgan summa:</b> " + MoneyFormatter.format(amount) + "\n\n";
+                    if (remaining.isEmpty()) {
+                        header += "ℹ️ Ushbu kunda boshqa operatsiyalar qolmadi.";
+                        apiClient.editMessageText(chatId, messageId, header,
+                                inlineKeyboardFactory.getMainMenuReturnKeyboard(), "HTML");
+                    } else {
+                        String listMsg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(txDate, remaining, user.getTimezone());
+                        apiClient.editMessageText(chatId, messageId, header + listMsg,
+                                inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
+                    }
                 }
             }
             case "delete_cancel" -> {
                 Transaction tx = transactionService.getByIdAndUser(txId, user.getId());
-                TransactionDto dto = transactionService.toDto(tx);
-                String msg = BotMessageBuilder.buildTransactionDetail(dto, user.getTimezone());
+                LocalDate txDate = tx.getTransactionDate();
+                List<Transaction> remaining = transactionRepository.findByUserIdAndTransactionDateOrderByCreatedAtAsc(user.getId(), txDate);
+                String msg = BotMessageBuilder.buildDayTransactionsHistoryDetailed(txDate, remaining, user.getTimezone());
                 apiClient.editMessageText(chatId, messageId, msg,
-                        inlineKeyboardFactory.getHistoryItemActionsKeyboard(txId, tx.getTransactionDate()), "HTML");
+                        inlineKeyboardFactory.getDailyOperationsKeyboard(remaining, txDate), "HTML");
             }
             case "edit" -> {
                 apiClient.editMessageText(chatId, messageId, "Qaysi maydonni tahrirlaysiz?",
