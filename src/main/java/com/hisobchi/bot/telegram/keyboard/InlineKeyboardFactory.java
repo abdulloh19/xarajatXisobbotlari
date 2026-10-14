@@ -71,7 +71,7 @@ public class InlineKeyboardFactory {
                                     new InlineKeyboardButton("❌ Yo‘q (Alohida)", "draft:save_today_separate:" + draftId)
                             ),
                             List.of(
-                                    new InlineKeyboardButton("📅 Oldingi kundan", "draft:save_yesterday:" + draftId)
+                                    new InlineKeyboardButton("💰 Oldingi foydadan", "draft:save_yesterday:" + draftId)
                             ),
                             List.of(
                                     new InlineKeyboardButton("✏️ Tahrirlash", "draft:edit:" + draftId),
@@ -83,8 +83,8 @@ public class InlineKeyboardFactory {
 
         if (isOffDay) {
             String label = (lastWorkDayText != null && !lastWorkDayText.isBlank())
-                    ? "📅 Oldingi ishlagan kundan (" + lastWorkDayText + ")"
-                    : "📅 Oldingi ishlagan kundan";
+                    ? "💰 Oldingi ishlagan kundan (" + lastWorkDayText + ")"
+                    : "💰 Oldingi foydadan";
             return InlineKeyboardMarkup.builder()
                     .inlineKeyboard(List.of(
                             List.of(
@@ -100,7 +100,7 @@ public class InlineKeyboardFactory {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("📅 Oldingi kundan", "draft:save_yesterday:" + draftId),
+                                new InlineKeyboardButton("💰 Oldingi foydadan", "draft:save_yesterday:" + draftId),
                                 new InlineKeyboardButton("📅 Bugungi foydadan", "draft:save_today:" + draftId)
                         ),
                         List.of(
@@ -894,7 +894,8 @@ public class InlineKeyboardFactory {
                                 new InlineKeyboardButton("➖ Minus qilish (-)", "profit:op:sub:" + dateStr)
                         ),
                         List.of(
-                                new InlineKeyboardButton("✏️ Yangitdan kiritish", "profit:op:edit:" + dateStr)
+                                new InlineKeyboardButton("✏️ Yangitdan kiritish", "profit:op:edit:" + dateStr),
+                                new InlineKeyboardButton("🗑 Foydani o‘chirish", "profit:op:delete:" + dateStr)
                         ),
                         List.of(
                                 new InlineKeyboardButton("❌ Bekor qilish", "profit:op:cancel")

@@ -109,6 +109,31 @@ public class BalanceService {
         return balanceRepository.save(balance);
     }
 
+    @Transactional
+    public UserBalance deductExpenseFromBalance(User user, BigDecimal amount) {
+        UserBalance balance = getOrCreateBalance(user);
+        BigDecimal safeAmt = amount != null ? amount : BigDecimal.ZERO;
+        BigDecimal currentCash = balance.getCashBalance() != null ? balance.getCashBalance() : BigDecimal.ZERO;
+        BigDecimal currentCard = balance.getCardBalance() != null ? balance.getCardBalance() : BigDecimal.ZERO;
+
+        BigDecimal newCash = currentCash.subtract(safeAmt);
+        BigDecimal newCard = currentCard;
+        if (newCash.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal deficit = newCash.abs();
+            newCash = BigDecimal.ZERO;
+            newCard = currentCard.subtract(deficit);
+            if (newCard.compareTo(BigDecimal.ZERO) < 0) {
+                newCard = BigDecimal.ZERO;
+            }
+        }
+        balance.setCashBalance(newCash);
+        balance.setCardBalance(newCard);
+        UserBalance saved = balanceRepository.save(balance);
+        log.info("Deducted expense {} from user {} balance: newCash={}, newCard={}, totalAvailable={}",
+                safeAmt, user.getId(), newCash, newCard, saved.getAvailableBalance());
+        return saved;
+    }
+
     private boolean isCard(String paymentMethod) {
         if (paymentMethod == null) return false;
         String lower = paymentMethod.trim().toLowerCase();

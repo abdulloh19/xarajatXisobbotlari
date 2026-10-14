@@ -73,16 +73,18 @@ public final class BotMessageBuilder {
         if (draft.type() == TransactionType.EXPENSE) {
             sb.append("━━━━━━━━━━━━━━━━━━\n");
             if (hasEnteredProfitToday) {
-                sb.append("🤔 <b>Bugungi foydadan minus qilinsinmi?</b>\n\n");
-                sb.append("✅ <b>Ha</b> — kiritilgan kunlik foydadan ayiriladi, umumiy topilgan pul o‘zgarmaydi.\n");
-                sb.append("❌ <b>Yo‘q</b> — alohida xarajat bo‘ladi, umumiy topilgan pulga va xarajatga qo‘shiladi.");
+                sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n\n");
+                sb.append("✅ <b>Ha (Foydadan minus)</b> — bugungi kiritilgan foydadan ayiriladi.\n");
+                sb.append("💰 <b>Oldingi foydadan</b> — sizdagi bor foydadan (balansdan) ayiriladi.\n");
+                sb.append("❌ <b>Yo‘q (Alohida)</b> — alohida xarajat bo‘ladi.");
             } else if (isOffDay) {
                 sb.append("🏖 <b>Bugun dam olish kuni.</b>\n");
-                String dayLabel = (lastWorkDayText != null && !lastWorkDayText.isBlank()) ? lastWorkDayText : "oldingi ishlagan kun";
-                sb.append("<i>Bu xarajat ").append(dayLabel).append(" foydasidan ayiriladi:</i>");
+                sb.append("<i>Bu xarajat sizdagi bor foydadan (balansdan) ayiriladi:</i>");
             } else {
-                sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n");
-                sb.append("<i>Oldingi yoki bugungi foydani tanlang:</i>");
+                sb.append("🤔 <b>Bu xarajat qaysi foydadan qilindi?</b>\n\n");
+                sb.append("💰 <b>Oldingi foydadan</b> — sizdagi bor foydadan (balansdan) ayiriladi.\n");
+                sb.append("📅 <b>Bugungi foydadan</b> — bugungi foyda hisobidan ayiriladi.\n");
+                sb.append("❌ <b>Alohida xarajat</b> — foydaga tegilmaydi.");
             }
         } else {
             sb.append("<b>Ma’lumot to‘g‘rimi?</b>");
@@ -96,6 +98,16 @@ public final class BotMessageBuilder {
 
     public static String buildDraftConfirmationMessage(DraftDto draft, String timezone) {
         return buildDraftConfirmationMessage(draft, timezone, false, null, false);
+    }
+
+    public static String buildSaveSuccessMessageFromPreviousProfit(TransactionDto tx, BigDecimal availableBalance, BigDecimal todayTotalExpense) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("✅ <b>Saqlandi</b>\n\n");
+        sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Oldingi foydadan ayirildi)\n");
+        sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+        sb.append("💰 Sizda qolgan mavjud foyda:\n<b>").append(MoneyFormatter.format(availableBalance != null ? availableBalance : BigDecimal.ZERO)).append("</b>\n\n");
+        sb.append("💸 Bugungi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(todayTotalExpense != null ? todayTotalExpense : BigDecimal.ZERO)).append("</b>");
+        return sb.toString();
     }
 
     public static String buildSaveSuccessMessageWithSource(TransactionDto tx, boolean fromYesterday, String profitSourceLabel, BigDecimal totalExpense, BigDecimal totalIncome, BigDecimal netProfit) {

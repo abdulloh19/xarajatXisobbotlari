@@ -982,6 +982,18 @@ public class CallbackQueryHandler {
                             "💵 <b>" + dateLabel + " naqd puldagi foydani kiriting:</b>\n<i>Masalan: 120000 yoki 120 ming</i>\n(Agar naqd bo'lmasa <code>0</code> deb yozing)",
                             replyKeyboardFactory.getCancelMenu(), "HTML");
                 }
+                case "delete" -> {
+                    dailyProfitService.deleteProfit(user.getId(), targetDate);
+                    DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, targetDate);
+                    String msg = String.format("""
+                            🗑 <b>%s foyda bekor qilindi (o‘chirildi)!</b>
+
+                            Bugun foyda kiritilmagan deb belgilandi.
+                            💸 Bugungi umumiy xarajatlar: <b>%s</b>
+                            """, dateLabel, MoneyFormatter.format(stats.totalExpense()));
+                    apiClient.editMessageText(chatId, messageId, msg, inlineKeyboardFactory.getMainMenuReturnKeyboard(), "HTML");
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                }
             }
         } else if ("work".equals(parts[1])) {
             String choice = parts[2];
@@ -1084,7 +1096,7 @@ public class CallbackQueryHandler {
                             replyKeyboardFactory.getMainMenu(), null);
                 }
             }
-            case "save_yesterday" -> handleSaveExpense(user, chatId, messageId, draftId, true);
+            case "save_previous_profit", "save_yesterday" -> handleSaveExpenseFromPreviousProfit(user, chatId, messageId, draftId);
             case "save_today", "save_today_deduct" -> handleSaveExpense(user, chatId, messageId, draftId, false);
             case "save_today_separate" -> handleSaveExpenseSeparate(user, chatId, messageId, draftId);
             case "cancel" -> {
@@ -1227,6 +1239,39 @@ public class CallbackQueryHandler {
             apiClient.sendMessage(chatId, "⚠️ " + e.getMessage(), replyKeyboardFactory.getMainMenu(), null);
         } catch (Exception e) {
             log.error("Failed to save expense draft {} with isYesterday={}: {}", draftId, isYesterday, e.getMessage(), e);
+            apiClient.sendMessage(chatId, "⚠️ Xatolik yuz berdi. Qaytadan urinib ko‘ring.",
+                    replyKeyboardFactory.getMainMenu(), null);
+        }
+    }
+
+    private void handleSaveExpenseFromPreviousProfit(User user, Long chatId, Integer messageId, Long draftId) {
+        String actionKey = "save_draft_" + draftId;
+        if (!idempotencyService.tryAcquireAction(actionKey)) {
+            log.warn("Duplicate save ignored for draft {}", draftId);
+            return;
+        }
+
+        try {
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            TransactionDto saved = transactionService.confirmAndSaveWithDate(draftId, user.getId(), today);
+
+            // 1. Deduct directly from user balance (manda bor foydadan)
+            com.hisobchi.bot.user.entity.UserBalance balance = balanceService.deductExpenseFromBalance(user, saved.amount());
+
+            // 2. Do NOT touch any past or today's DailyProfit/DailySummary
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
+
+            String successMsg = BotMessageBuilder.buildSaveSuccessMessageFromPreviousProfit(
+                    saved, balance.getAvailableBalance(), targetStats.totalExpense());
+
+            apiClient.editMessageText(chatId, messageId, successMsg,
+                    inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+            userService.updateState(user.getTelegramId(), UserState.IDLE);
+
+        } catch (ValidationException e) {
+            apiClient.sendMessage(chatId, "⚠️ " + e.getMessage(), replyKeyboardFactory.getMainMenu(), null);
+        } catch (Exception e) {
+            log.error("Failed to save expense draft {} from previous profit: {}", draftId, e.getMessage(), e);
             apiClient.sendMessage(chatId, "⚠️ Xatolik yuz berdi. Qaytadan urinib ko‘ring.",
                     replyKeyboardFactory.getMainMenu(), null);
         }

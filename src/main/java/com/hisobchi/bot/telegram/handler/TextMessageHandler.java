@@ -1506,6 +1506,9 @@ public class TextMessageHandler {
         String lower = text.toLowerCase().trim()
                 .replace("’", "'").replace("‘", "'").replace("`", "'");
 
+        boolean isPreviousProfit = lower.contains("oldingi") || lower.contains("bor foyda") || lower.contains("kechagi")
+                || lower.equals("oldingi foydadan") || lower.equals("oldingi kundan") || lower.equals("oldingi foyda");
+
         boolean isDeduct = lower.equals("ha") || lower.equals("ha foydadan minus") || lower.equals("foydadan minus")
                 || lower.equals("foydadan minus qil") || lower.equals("foydadan ayir") || lower.equals("foydadan ayrilsin")
                 || lower.equals("ha foydadan") || lower.equals("foydadan") || lower.equals("ha, foydadan minus");
@@ -1514,7 +1517,7 @@ public class TextMessageHandler {
                 || lower.equals("alohida xarajat") || lower.equals("foydadan minus qilinmasin") || lower.equals("foydadan ayirma")
                 || lower.equals("yoq alohida") || lower.equals("yo'q alohida") || lower.equals("yo'q, alohida");
 
-        if (!isDeduct && !isSeparate) {
+        if (!isDeduct && !isSeparate && !isPreviousProfit) {
             return false;
         }
 
@@ -1531,7 +1534,13 @@ public class TextMessageHandler {
         LocalDate today = DateTimeUtils.today(user.getTimezone());
         TransactionDto saved = transactionService.confirmAndSaveWithDate(draft.getId(), user.getId(), today);
 
-        if (isDeduct) {
+        if (isPreviousProfit || (isDeduct && !dailyProfitService.hasEnteredProfitToday(user, today))) {
+            com.hisobchi.bot.user.entity.UserBalance balance = balanceService.deductExpenseFromBalance(user, saved.amount());
+            DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
+            String successMsg = BotMessageBuilder.buildSaveSuccessMessageFromPreviousProfit(
+                    saved, balance.getAvailableBalance(), targetStats.totalExpense());
+            apiClient.sendMessage(chatId, successMsg, inlineKeyboardFactory.getSavedTransactionKeyboard(saved.id()), "HTML");
+        } else if (isDeduct) {
             dailyProfitService.deductFromProfit(user, today, saved.amount());
             DailyStatisticsDto targetStats = statisticsService.getDailyStatistics(user, today);
             String successMsg = BotMessageBuilder.buildSaveSuccessMessageWithSource(
@@ -1584,7 +1593,25 @@ public class TextMessageHandler {
             return true;
         }
 
-        // Case 1: Expense deducted from today's profit (e.g. "bugungi foydadan 10 min xarajatga qoshib qoy", "foydadan 20 ming xarajat", "harajat qoshib foydadan minus qil 50000")
+        // Delete today's profit command
+        if (lowerText.contains("ochir") || lowerText.contains("o'chir") || lowerText.contains("o‘chir") || lowerText.contains("bekor qil")) {
+            if (lowerText.contains("bugungi foyda") || lowerText.contains("bugungi foydani") || lowerText.contains("foydani")) {
+                LocalDate today = DateTimeUtils.today(user.getTimezone());
+                dailyProfitService.deleteProfit(user.getId(), today);
+                DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+                String msg = String.format("""
+                        🗑 <b>Bugungi kiritilgan foyda bekor qilindi (o‘chirildi)!</b>
+
+                        Bugun foyda kiritilmagan deb belgilandi.
+                        💸 Bugungi umumiy xarajatlar: <b>%s</b>
+                        """, MoneyFormatter.format(stats.totalExpense()));
+                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getMainMenuReturnKeyboard(), "HTML");
+                userService.updateState(user.getTelegramId(), UserState.IDLE);
+                return true;
+            }
+        }
+
+        // Case 1: Expense deducted from profit (e.g. "bugungi foydadan 10 min xarajatga qoshib qoy", "oldingi foydadan 20 ming xarajat")
         boolean isExpenseContext = lowerText.contains("xarajat") || lowerText.contains("qarajat") || lowerText.contains("harajat")
                 || categoryMatcher.matchCategory(text, TransactionType.EXPENSE).isPresent();
         if (isExpenseContext) {
@@ -1605,7 +1632,32 @@ public class TextMessageHandler {
                     }
                 }
 
-                // Deduct from today's profit
+                boolean isFromPrevious = lowerText.contains("oldingi") || lowerText.contains("kechagi") || lowerText.contains("bor foyda");
+                boolean hasTodayProfit = dailyProfitService.hasEnteredProfitToday(user, today);
+
+                if (isFromPrevious || !hasTodayProfit) {
+                    com.hisobchi.bot.user.entity.UserBalance balance = balanceService.deductExpenseFromBalance(user, amount);
+                    Transaction tx = Transaction.builder()
+                            .user(user)
+                            .amount(amount)
+                            .type(TransactionType.EXPENSE)
+                            .category(category)
+                            .currency("UZS")
+                            .description("Oldingi foydadan xarajat")
+                            .source(TransactionSource.TEXT)
+                            .transactionDate(today)
+                            .build();
+                    Transaction saved = transactionRepository.save(tx);
+                    DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+                    String successMsg = BotMessageBuilder.buildSaveSuccessMessageFromPreviousProfit(
+                            transactionService.toDto(saved), balance.getAvailableBalance(), stats.totalExpense());
+                    apiClient.sendMessage(chatId, successMsg,
+                            inlineKeyboardFactory.getSavedTransactionKeyboard(saved.getId()), "HTML");
+                    userService.updateState(user.getTelegramId(), UserState.IDLE);
+                    return true;
+                }
+
+                // Otherwise deduct from today's profit
                 dailyProfitService.deductFromProfit(user, today, amount);
 
                 Transaction tx = Transaction.builder()

@@ -408,5 +408,47 @@ class DailyProfitExpenseDeductionTest {
         assertEquals(new BigDecimal("-40000"), result.getTotalProfit());
         verify(balanceService, never()).updateDailyProfitDelta(any(), any(), any());
     }
+
+    @Test
+    @DisplayName("deleteProfit removes daily profit record for user and date")
+    void testDeleteProfit() {
+        LocalDate date = LocalDate.now();
+        DailyProfit p = DailyProfit.builder()
+                .id(10L)
+                .user(testUser)
+                .profitDate(date)
+                .totalProfit(new BigDecimal("50000"))
+                .build();
+
+        when(dailyProfitRepository.findByUserIdAndProfitDate(testUser.getId(), date))
+                .thenReturn(Optional.of(p));
+
+        dailyProfitService.deleteProfit(testUser.getId(), date);
+
+        verify(dailyProfitRepository, times(1)).delete(p);
+    }
+
+    @Test
+    @DisplayName("buildSaveSuccessMessageFromPreviousProfit formats message correctly without inflating today profit")
+    void testBuildSaveSuccessMessageFromPreviousProfit() {
+        com.hisobchi.bot.transaction.dto.TransactionDto tx = new com.hisobchi.bot.transaction.dto.TransactionDto(
+                1L, 1L, 1L, "Ovqat", "🍽", TransactionType.EXPENSE, new BigDecimal("22000"), "UZS",
+                "Oldingi foydadan xarajat", com.hisobchi.bot.transaction.entity.TransactionSource.TEXT,
+                LocalDate.now(), java.time.Instant.now()
+        );
+
+        String msg = com.hisobchi.bot.telegram.handler.BotMessageBuilder.buildSaveSuccessMessageFromPreviousProfit(
+                tx, new BigDecimal("29000"), new BigDecimal("122000")
+        );
+
+        assertNotNull(msg);
+        assertTrue(msg.contains("Oldingi foydadan ayirildi"));
+        assertTrue(msg.contains("22 000"));
+        assertTrue(msg.contains("Ovqat"));
+        assertTrue(msg.contains("29 000"));
+        assertTrue(msg.contains("122 000"));
+        assertFalse(msg.contains("Bugungi foydadan minus qilindi"));
+        assertFalse(msg.contains("Bugungi umumiy topilgan pul"));
+    }
 }
 

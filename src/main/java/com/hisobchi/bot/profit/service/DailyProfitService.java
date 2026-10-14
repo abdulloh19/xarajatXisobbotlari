@@ -116,6 +116,14 @@ public class DailyProfitService {
     }
 
     @Transactional
+    public void deleteProfit(Long userId, LocalDate date) {
+        dailyProfitRepository.findByUserIdAndProfitDate(userId, date).ifPresent(p -> {
+            dailyProfitRepository.delete(p);
+            log.info("Deleted daily profit for user {} on {}", userId, date);
+        });
+    }
+
+    @Transactional
     public void deductFromProfit(User user, LocalDate date, BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) return;
         Optional<DailyProfit> profitOpt = dailyProfitRepository.findByUserIdAndProfitDate(user.getId(), date);
