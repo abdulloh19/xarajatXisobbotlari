@@ -33,5 +33,7 @@ public interface TransactionDraftRepository extends JpaRepository<TransactionDra
     @Query("DELETE FROM TransactionDraft d WHERE d.user.id = :userId AND d.type = :type")
     void deleteByUserIdAndType(@Param("userId") Long userId, @Param("type") com.hisobchi.bot.transaction.entity.TransactionType type);
 
-    void deleteByUserId(Long userId);
+    @Modifying
+    @Query("DELETE FROM TransactionDraft d WHERE d.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

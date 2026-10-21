@@ -827,13 +827,29 @@ public class InlineKeyboardFactory {
         return InlineKeyboardMarkup.builder()
                 .inlineKeyboard(List.of(
                         List.of(
-                                new InlineKeyboardButton("💵 Foyda va daromadlarni o‘chirish", "data:reset:profit:ask")
+                                new InlineKeyboardButton("🗑 Barcha operatsiyalar tarixini o‘chirish", "data:reset:history:ask")
                         ),
                         List.of(
-                                new InlineKeyboardButton("💸 Xarajatlarni o‘chirish", "data:reset:expense:ask")
+                                new InlineKeyboardButton("💸 Faqat xarajatlarni o‘chirish", "data:reset:expense:ask")
                         ),
                         List.of(
-                                new InlineKeyboardButton("🔄 Barchasini tozalash (Hammasi noldan)", "data:reset:all:ask")
+                                new InlineKeyboardButton("💵 Faqat foyda va daromadlarni o‘chirish", "data:reset:profit:ask")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("🔄 Butkul barchasini nollashtirish (Qarzlar bilan)", "data:reset:all:ask")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")
+                        )
+                ))
+                .build();
+    }
+
+    public InlineKeyboardMarkup getResetHistoryConfirmKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("🗑 Ha, operatsiyalar tarixini o‘chirish", "data:reset:history:confirm")
                         ),
                         List.of(
                                 new InlineKeyboardButton("❌ Bekor qilish", "data:reset:cancel")

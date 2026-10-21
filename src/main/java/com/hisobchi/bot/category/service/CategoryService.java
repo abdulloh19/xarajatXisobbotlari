@@ -24,31 +24,18 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     private static final List<DefaultCategoryDef> DEFAULT_EXPENSES = List.of(
-            new DefaultCategoryDef("Ovqat", "🍽"),
-            new DefaultCategoryDef("Transport", "🚕"),
-            new DefaultCategoryDef("Uy", "🏠"),
-            new DefaultCategoryDef("Bozor", "🛒"),
-            new DefaultCategoryDef("Yoqilg‘i", "⛽"),
-            new DefaultCategoryDef("Ish", "🔧"),
-            new DefaultCategoryDef("Material", "📦"),
-            new DefaultCategoryDef("Kommunal", "💡"),
-            new DefaultCategoryDef("Aloqa / Internet", "📱"),
-            new DefaultCategoryDef("Oila", "👨‍👩‍👧"),
-            new DefaultCategoryDef("Sovg‘a", "🎁"),
-            new DefaultCategoryDef("Dori", "💊"),
-            new DefaultCategoryDef("Ko‘ngilochar", "🎉"),
-            new DefaultCategoryDef("Kredit / Qarzdorlik", "💳"),
-            new DefaultCategoryDef("Ta’lim", "📚"),
-            new DefaultCategoryDef("Sayohat", "✈️"),
+            new DefaultCategoryDef("Oziq-ovqat", "🍽"),
+            new DefaultCategoryDef("Transport va Yoqilg‘i", "🚕"),
+            new DefaultCategoryDef("Ro‘zg‘or va Kommunal", "🏠"),
+            new DefaultCategoryDef("Oila va Salomatlik", "👨‍👩‍👧"),
+            new DefaultCategoryDef("Biznes va Ish", "💼"),
             new DefaultCategoryDef("Boshqa", "📌")
     );
 
     private static final List<DefaultCategoryDef> DEFAULT_INCOMES = List.of(
-            new DefaultCategoryDef("Ish", "💼"),
-            new DefaultCategoryDef("Xizmat", "🛠"),
-            new DefaultCategoryDef("Savdo", "🛍"),
-            new DefaultCategoryDef("Naqd", "💵"),
-            new DefaultCategoryDef("O‘tkazma", "🏦"),
+            new DefaultCategoryDef("Savdo va Foyda", "💰"),
+            new DefaultCategoryDef("Oylik va Ish haqi", "💼"),
+            new DefaultCategoryDef("Xizmat ko‘rsatish", "🛠"),
             new DefaultCategoryDef("Boshqa", "📌")
     );
 
@@ -105,7 +92,56 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public Optional<Category> findByName(Long userId, String name, CategoryType type) {
-        return categoryRepository.findByUserIdAndNameIgnoreCaseAndType(userId, name, type);
+        if (name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<Category> found = categoryRepository.findByUserIdAndNameIgnoreCaseAndType(userId, name.trim(), type);
+        if (found.isPresent()) {
+            return found;
+        }
+
+        // Alias mapping to generalized categories
+        String mapped = mapToGeneralizedCategoryName(name.trim(), type);
+        if (mapped != null && !mapped.equalsIgnoreCase(name.trim())) {
+            return categoryRepository.findByUserIdAndNameIgnoreCaseAndType(userId, mapped, type);
+        }
+
+        return Optional.empty();
+    }
+
+    private String mapToGeneralizedCategoryName(String name, CategoryType type) {
+        String lower = name.toLowerCase().replace("’", "'").replace("‘", "'").replace("`", "'");
+
+        if (type == CategoryType.EXPENSE) {
+            if (lower.contains("ovqat") || lower.contains("obed") || lower.contains("tushlik") || lower.contains("bozor") || lower.contains("oziq")) {
+                return "Oziq-ovqat";
+            }
+            if (lower.contains("transport") || lower.contains("yoqilg") || lower.contains("benzin") || lower.contains("gaz") || lower.contains("taxi") || lower.contains("taksi")) {
+                return "Transport va Yoqilg‘i";
+            }
+            if (lower.contains("ro'zg'or") || lower.contains("rozgor") || lower.contains("uy") || lower.contains("ijara") || lower.contains("arenda") || lower.contains("kommunal") || lower.contains("svet") || lower.contains("suv") || lower.contains("aloqa") || lower.contains("internet") || lower.contains("wifi")) {
+                return "Ro‘zg‘or va Kommunal";
+            }
+            if (lower.contains("oila") || lower.contains("dori") || lower.contains("apteka") || lower.contains("salomatlik") || lower.contains("sovg'a") || lower.contains("sovga") || lower.contains("ko'ngil") || lower.contains("dam") || lower.contains("ta'lim") || lower.contains("talim") || lower.contains("bolalar") || lower.contains("sayohat")) {
+                return "Oila va Salomatlik";
+            }
+            if (lower.contains("material") || lower.contains("ish") || lower.contains("biznes") || lower.contains("usta") || lower.contains("zapchast") || lower.contains("kredit") || lower.contains("soliq")) {
+                return "Biznes va Ish";
+            }
+            return "Boshqa";
+        } else if (type == CategoryType.INCOME) {
+            if (lower.contains("savdo") || lower.contains("foyda") || lower.contains("daromad") || lower.contains("tushum") || lower.contains("sotuv") || lower.contains("magazin")) {
+                return "Savdo va Foyda";
+            }
+            if (lower.contains("oylik") || lower.contains("maosh") || lower.contains("avans") || lower.contains("ish haqi") || lower.contains("ishhaqi") || lower.equals("ish")) {
+                return "Oylik va Ish haqi";
+            }
+            if (lower.contains("xizmat") || lower.contains("montaj") || lower.contains("remont") || lower.contains("usta") || lower.contains("klient")) {
+                return "Xizmat ko‘rsatish";
+            }
+            return "Boshqa";
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)

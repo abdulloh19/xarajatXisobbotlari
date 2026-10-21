@@ -115,4 +115,27 @@ class DataResetServiceTest {
         assertEquals(BigDecimal.ZERO, balance.getCashBalance());
         assertEquals(BigDecimal.ZERO, balance.getCardBalance());
     }
+
+    @Test
+    @DisplayName("deleteAllHistory should delete txs, drafts, profits, summaries and reset balances")
+    void testDeleteAllHistory() {
+        User user = User.builder().id(userId).build();
+        UserBalance balance = UserBalance.builder()
+                .user(user)
+                .cashBalance(new BigDecimal("150000"))
+                .cardBalance(new BigDecimal("50000"))
+                .build();
+        when(userBalanceRepository.findByUserId(userId)).thenReturn(Optional.of(balance));
+
+        dataResetService.deleteAllHistory(userId);
+
+        verify(draftRepository).deleteByUserId(userId);
+        verify(transactionRepository).deleteByUserId(userId);
+        verify(dailyProfitRepository).deleteByUserId(userId);
+        verify(dailySummaryRepository).deleteByUserId(userId);
+        verify(userBalanceRepository).save(balance);
+
+        assertEquals(BigDecimal.ZERO, balance.getCashBalance());
+        assertEquals(BigDecimal.ZERO, balance.getCardBalance());
+    }
 }

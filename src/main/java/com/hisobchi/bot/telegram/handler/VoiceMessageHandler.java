@@ -89,14 +89,6 @@ public class VoiceMessageHandler {
             return;
         }
 
-        // Check if voice message is a task/reminder
-        if (todoMessageHandler.handleCommandOrButton(user, chatId, transcribedText)) {
-            return;
-        }
-        if (todoMessageHandler.handleVoiceTaskFallback(user, chatId, transcribedText)) {
-            return;
-        }
-
         // Voice command for today's expenses list / delete expenses
         boolean isExpenseListOrDeleteVoice = lowerVoice.equals("xarajatlar") || lowerVoice.equals("xarajatlarim")
                 || lowerVoice.contains("bugungi xarajat") || lowerVoice.contains("xarajatlarni ko") || lowerVoice.contains("xarajatlarni kor")

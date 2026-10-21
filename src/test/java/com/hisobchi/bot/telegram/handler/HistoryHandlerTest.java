@@ -229,6 +229,36 @@ class HistoryHandlerTest {
         assertEquals("history:back", backBtn.getCallbackData());
     }
 
+    @Test
+    @DisplayName("Main menu only contains Kunlik natija, Oylik natija, Qarzlar and Tarixni tozalash")
+    void testMainMenuMinimalStructure() {
+        ReplyKeyboardMarkup menu = replyKeyboardFactory.getMainMenu();
+        assertNotNull(menu);
+        assertEquals(2, menu.getKeyboard().size());
+        assertEquals("📊 Kunlik natija", menu.getKeyboard().get(0).get(0).getText());
+        assertEquals("🗓 Oylik natija", menu.getKeyboard().get(0).get(1).getText());
+        assertEquals("🤝 Qarzlar", menu.getKeyboard().get(1).get(0).getText());
+        assertEquals("🗑 Tarixni tozalash", menu.getKeyboard().get(1).get(1).getText());
+    }
+
+    @Test
+    @DisplayName("Clicking '🗑 Tarixni tozalash' sends data reset confirmation keyboard")
+    void testClickTarixniTozalash() {
+        Message msg = createTextMessage("🗑 Tarixni tozalash");
+        textMessageHandler.handle(user, msg);
+
+        verify(apiClient).sendMessage(eq(chatId), contains("Tarixni tozalash"), any(InlineKeyboardMarkup.class), eq("HTML"));
+    }
+
+    @Test
+    @DisplayName("Typing 'istoriyani ochirish' sends data reset confirmation keyboard")
+    void testTypeIstoriyaniOchirish() {
+        Message msg = createTextMessage("istoriyani ochirish");
+        textMessageHandler.handle(user, msg);
+
+        verify(apiClient).sendMessage(eq(chatId), contains("Tarixni tozalash"), any(InlineKeyboardMarkup.class), eq("HTML"));
+    }
+
     private Message createTextMessage(String text) {
         return Message.builder()
                 .messageId(1)

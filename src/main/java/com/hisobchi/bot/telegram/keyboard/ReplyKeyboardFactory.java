@@ -13,34 +13,12 @@ public class ReplyKeyboardFactory {
                 .resizeKeyboard(true)
                 .keyboard(List.of(
                         List.of(
-                                new KeyboardButton("💸 Xarajat qo‘shish"),
-                                new KeyboardButton("💰 Daromad qo‘shish")
+                                new KeyboardButton("📊 Kunlik natija"),
+                                new KeyboardButton("🗓 Oylik natija")
                         ),
                         List.of(
-                                new KeyboardButton("🎙 Ovoz bilan kiritish")
-                        ),
-                        List.of(
-                                new KeyboardButton("📊 Bugungi statistika"),
-                                new KeyboardButton("📅 Haftalik statistika")
-                        ),
-                        List.of(
-                                new KeyboardButton("🗓 Oylik statistika"),
-                                new KeyboardButton("📜 Tarix")
-                        ),
-                        List.of(
-                                new KeyboardButton("💵 Foydani kiritish"),
-                                new KeyboardButton("🤝 Qarzlar")
-                        ),
-                        List.of(
-                                new KeyboardButton("📊 Hisobotlar"),
-                                new KeyboardButton("📂 Kategoriyalar")
-                        ),
-                        List.of(
-                                new KeyboardButton("⚙️ Sozlamalar"),
-                                new KeyboardButton("🔐 Kunni yopish")
-                        ),
-                        List.of(
-                                new KeyboardButton("✅ Vazifalar")
+                                new KeyboardButton("🤝 Qarzlar"),
+                                new KeyboardButton("🗑 Tarixni tozalash")
                         )
                 ))
                 .build();
@@ -144,6 +122,7 @@ public class ReplyKeyboardFactory {
                                 new KeyboardButton("🗓 Shu oy")
                         ),
                         List.of(
+                                new KeyboardButton("🗑 Tarixni tozalash"),
                                 new KeyboardButton("⬅️ Asosiy menyu")
                         )
                 ))

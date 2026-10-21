@@ -20,5 +20,7 @@ public interface DailyProfitRepository extends JpaRepository<DailyProfit, Long> 
 
     List<DailyProfit> findAllByUserIdAndProfitDateLessThanOrderByProfitDateDesc(Long userId, LocalDate date);
 
-    void deleteByUserId(Long userId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM DailyProfit p WHERE p.user.id = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

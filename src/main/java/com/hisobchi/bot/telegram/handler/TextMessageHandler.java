@@ -180,10 +180,13 @@ public class TextMessageHandler {
             case "💸 Xarajat qo‘shish", "💸 Xarajat qo'shish", "Xarajat qo‘shish", "Xarajat qo'shish",
                  "💰 Daromad qo‘shish", "💰 Daromad qo'shish", "Daromad qo‘shish", "Daromad qo'shish",
                  "🎙 Ovoz bilan kiritish",
+                 "📊 Kunlik natija", "Kunlik natija",
                  "📊 Bugungi statistika", "📊 Statistika", "Statistika",
                  "📅 Haftalik statistika",
+                 "🗓 Oylik natija", "Oylik natija",
                  "🗓 Oylik statistika",
                  "📜 Tarix", "Tarix",
+                 "🗑 Tarixni tozalash", "Tarixni tozalash", "Istoriyani o'chirish", "Istoriyani o‘chirish", "Istoriyani ochirish",
                  "📂 Kategoriyalar", "⚙️ Sozlamalar", "Sozlamalar",
                  "🔐 Kunni yopish", "Kunni yopish",
                  "💵 Foydani kiritish", "💵 Foyda kiritish", "Foydani kiritish", "Foyda kiritish", "💵 Foyda", "Foyda",
@@ -303,7 +306,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
-            case "📊 Bugungi statistika", "📊 Statistika", "Statistika" -> {
+            case "📊 Kunlik natija", "Kunlik natija", "📊 Bugungi statistika", "📊 Statistika", "Statistika" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
                 String msg = BotMessageBuilder.buildDailyStatisticsMessage(stats);
@@ -317,7 +320,7 @@ public class TextMessageHandler {
                 apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
-            case "🗓 Oylik statistika" -> {
+            case "🗓 Oylik natija", "Oylik natija", "🗓 Oylik statistika", "Oylik statistika" -> {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 MonthlyStatisticsDto stats = statisticsService.getMonthlyStatistics(user, today);
                 String msg = BotMessageBuilder.buildMonthlyStatisticsMessage(stats);
@@ -574,12 +577,13 @@ public class TextMessageHandler {
                         replyKeyboardFactory.getCancelMenu(), "HTML");
                 return;
             }
-            case "🔄 Ma'lumotlarni tozalash", "🔄 Bugundan boshlash (tozalash)", "/reset", "/tozalash", "tozalash" -> {
+            case "🗑 Tarixni tozalash", "Tarixni tozalash", "Istoriyani o'chirish", "Istoriyani o‘chirish", "Istoriyani ochirish", "istoriyani ochirish", "tarixni tozalash", "tarixni ochirish",
+                 "🔄 Ma'lumotlarni tozalash", "🔄 Bugundan boshlash (tozalash)", "/reset", "/tozalash", "tozalash" -> {
                 apiClient.sendMessage(chatId,
                         """
-                        ⚙️ <b>Ma'lumotlarni tozalash bo‘limi:</b>
+                        🗑 <b>Tarixni tozalash (Bazadan o‘chirish):</b>
 
-                        Qaysi ma'lumotlarni o‘chirmoqchisiz? Quyidagilardan birini tanlang:
+                        Qaysi ma'lumotlarni bazadan butkul o‘chirmoqchisiz? Quyidagilardan birini tanlang:
                         """,
                         inlineKeyboardFactory.getDataResetMenuKeyboard(), "HTML");
                 return;
@@ -612,12 +616,7 @@ public class TextMessageHandler {
             }
         }
 
-        // 3.5 Check To-Do commands or natural task message
-        if (todoMessageHandler.handleCommandOrButton(user, chatId, trimmed)) {
-            return;
-        }
-
-        // 4. Natural Language Text Processing (Debt or Transaction)
+        // 4. Natural Language Text Processing (Debt, Profit or Expense Transaction)
         handleNaturalTextMessage(user, chatId, trimmed);
     }
 
@@ -718,18 +717,18 @@ public class TextMessageHandler {
                 String msg = String.format("""
                         ✅ <b>%s foyda saqlandi!</b>
 
-                        💵 <b>Naqd:</b> %s
-                        💳 <b>Karta:</b> %s
+                        💰 <b>FOYDA:</b> <b>%s</b>
+                        📂 <b>Kategoriya:</b> 💰 Savdo va Foyda
+                        <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
                         ━━━━━━━━━━━━━━━━━━
-                        ✅ <b>FOYDA:</b> %s
                         💸 <b>Xarajatlar:</b> %s
                         💰 <b>Umumiy ishlab topilgan:</b> %s
                         ━━━━━━━━━━━━━━━━━━
                         """,
                         dateLabel,
+                        MoneyFormatter.format(totalProfit),
                         MoneyFormatter.format(cash),
                         MoneyFormatter.format(card),
-                        MoneyFormatter.format(totalProfit),
                         MoneyFormatter.format(expense),
                         MoneyFormatter.format(totalEarned)
                 );
@@ -1725,6 +1724,7 @@ public class TextMessageHandler {
                 String msg = String.format("""
                         ✅ <b>Bugungi foydadan ayirildi (minus qilindi)!</b>
 
+                        📂 <b>Kategoriya:</b> 💰 Savdo va Foyda
                         📌 Oldingi foyda: <b>%s</b>
                         ➖ Ayirildi: <b>%s</b>
                         ━━━━━━━━━━━━━━━━━━
@@ -1756,6 +1756,7 @@ public class TextMessageHandler {
                 String msg = String.format("""
                         ✅ <b>Bugungi foydaga qo‘shildi!</b>
 
+                        📂 <b>Kategoriya:</b> 💰 Savdo va Foyda
                         📌 Oldingi foyda: <b>%s</b>
                         ➕ Qo‘shildi: <b>%s</b>
                         ━━━━━━━━━━━━━━━━━━
@@ -1772,6 +1773,37 @@ public class TextMessageHandler {
                 userService.updateState(user.getTelegramId(), UserState.IDLE);
                 return true;
             }
+        }
+
+        // Case 4: Direct set profit (e.g. "foyda 500 ming", "bugungi foyda 300000", "500 ming foyda", "kunlik foyda 400000")
+        Optional<BigDecimal> directAmtOpt = amountParser.parse(text);
+        if (directAmtOpt.isPresent() && directAmtOpt.get().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal profitAmt = directAmtOpt.get();
+            LocalDate today = DateTimeUtils.today(user.getTimezone());
+            boolean isCard = lowerText.contains("karta") || lowerText.contains("click") || lowerText.contains("payme");
+            BigDecimal cash = isCard ? BigDecimal.ZERO : profitAmt;
+            BigDecimal card = isCard ? profitAmt : BigDecimal.ZERO;
+
+            DailyProfit saved = dailyProfitService.saveOrUpdateProfit(user, today, cash, card);
+            DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
+
+            String msg = String.format("""
+                    ✅ <b>Bugungi foyda muvaffaqiyatli saqlandi!</b>
+
+                    💰 <b>Kunlik sof foyda:</b> <b>%s</b>
+                    📂 <b>Kategoriya:</b> 💰 Savdo va Foyda
+                    <i>(💵 Naqd: %s | 💳 Karta: %s)</i>
+                    ━━━━━━━━━━━━━━━━━━
+                    💸 <b>Bugungi xarajatlar:</b> %s
+                    """,
+                    MoneyFormatter.format(saved.getTotalProfit()),
+                    MoneyFormatter.format(saved.getCashAmount()),
+                    MoneyFormatter.format(saved.getCardAmount()),
+                    MoneyFormatter.format(stats.totalExpense())
+            );
+            apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
+            userService.updateState(user.getTelegramId(), UserState.IDLE);
+            return true;
         }
 
         return false;

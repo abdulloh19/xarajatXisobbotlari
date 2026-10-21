@@ -14,5 +14,7 @@ public interface DailySummaryRepository extends JpaRepository<DailySummary, Long
 
     boolean existsByUserIdAndSummaryDateAndClosedTrue(Long userId, LocalDate summaryDate);
 
-    void deleteByUserId(Long userId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM DailySummary s WHERE s.user.id = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

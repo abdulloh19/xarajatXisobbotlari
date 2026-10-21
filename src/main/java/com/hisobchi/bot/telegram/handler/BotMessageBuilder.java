@@ -58,7 +58,7 @@ public final class BotMessageBuilder {
         if (draft.type() == TransactionType.INCOME) {
             sb.append("💰 <b>Yangi daromad</b>\n\n");
             sb.append("💵 Summa:\n<b>").append(MoneyFormatter.format(draft.amount())).append("</b>\n\n");
-            sb.append("📌 Manba:\n").append(draft.categoryName() != null ? draft.getCategoryDisplayName() : "Aniqlanmagan").append("\n\n");
+            sb.append("📂 Kategoriya (Manba):\n").append(draft.categoryName() != null ? draft.getCategoryDisplayName() : "Aniqlanmagan").append("\n\n");
         } else {
             sb.append("💸 <b>Yangi xarajat</b>\n\n");
             sb.append("💰 Summa:\n<b>").append(MoneyFormatter.format(draft.amount())).append("</b>\n\n");
@@ -104,7 +104,7 @@ public final class BotMessageBuilder {
         StringBuilder sb = new StringBuilder();
         sb.append("✅ <b>Saqlandi</b>\n\n");
         sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Oldingi foydadan ayirildi)\n");
-        sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+        sb.append("📂 Kategoriya: ").append(tx.getCategoryDisplayName()).append("\n\n");
         sb.append("💰 Sizda qolgan mavjud foyda:\n<b>").append(MoneyFormatter.format(availableBalance != null ? availableBalance : BigDecimal.ZERO)).append("</b>\n\n");
         sb.append("💸 Bugungi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(todayTotalExpense != null ? todayTotalExpense : BigDecimal.ZERO)).append("</b>");
         return sb.toString();
@@ -116,12 +116,12 @@ public final class BotMessageBuilder {
         String label = (profitSourceLabel != null && !profitSourceLabel.isBlank()) ? profitSourceLabel : (fromYesterday ? "Oldingi ishlagan kun" : "Bugungi");
         if (fromYesterday) {
             sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (").append(label).append(" foydasidan ayirildi)\n");
-            sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("📂 Kategoriya: ").append(tx.getCategoryDisplayName()).append("\n\n");
             sb.append("💸 ").append(label).append(" umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
             sb.append("✅ ").append(label).append(" yakuniy sof foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
         } else {
             sb.append("💸 <b>").append(MoneyFormatter.format(tx.amount())).append("</b> (Bugungi foydadan minus qilindi)\n");
-            sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("📂 Kategoriya: ").append(tx.getCategoryDisplayName()).append("\n\n");
             sb.append("💰 Bugungi umumiy topilgan pul (o‘zgarmadi):\n<b>").append(MoneyFormatter.format(totalIncome)).append("</b>\n\n");
             sb.append("💸 Bugungi umumiy xarajatlar:\n<b>").append(MoneyFormatter.format(totalExpense)).append("</b>\n\n");
             sb.append("✅ Bugungi qolgan foyda:\n<b>").append(MoneyFormatter.format(netProfit)).append("</b>");
@@ -139,12 +139,12 @@ public final class BotMessageBuilder {
 
         if (tx.type() == TransactionType.INCOME) {
             sb.append("💰 +").append(MoneyFormatter.format(tx.amount())).append("\n");
-            sb.append("📌 ").append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("📂 Kategoriya: ").append(tx.getCategoryDisplayName()).append("\n\n");
             sb.append("💰 Bugungi umumiy ishlab topilgan:\n<b>").append(MoneyFormatter.format(todayTotalIncome)).append("</b>\n\n");
             sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
         } else {
             sb.append("💸 ").append(MoneyFormatter.format(tx.amount())).append("\n");
-            sb.append(tx.getCategoryDisplayName()).append("\n\n");
+            sb.append("📂 Kategoriya: ").append(tx.getCategoryDisplayName()).append("\n\n");
             sb.append("💸 Bugungi xarajatlar:\n<b>").append(MoneyFormatter.format(todayTotalExpense)).append("</b>\n\n");
             sb.append("✅ Bugungi foydangiz:\n<b>").append(MoneyFormatter.format(todayNetProfit)).append("</b>");
         }

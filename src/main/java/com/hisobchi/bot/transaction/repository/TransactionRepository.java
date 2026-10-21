@@ -123,5 +123,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("DELETE FROM Transaction t WHERE t.user.id = :userId AND t.type = :type")
     void deleteByUserIdAndType(@Param("userId") Long userId, @Param("type") TransactionType type);
 
-    void deleteByUserId(Long userId);
+    @Modifying
+    @Query("DELETE FROM Transaction t WHERE t.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
 }

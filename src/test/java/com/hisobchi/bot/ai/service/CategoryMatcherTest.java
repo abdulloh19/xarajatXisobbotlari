@@ -20,43 +20,43 @@ class CategoryMatcherTest {
     }
 
     @Test
-    @DisplayName("Match category: 'obedga 15 ming' -> Ovqat")
+    @DisplayName("Match category: 'obedga 15 ming' -> Oziq-ovqat")
     void testMatchOvqat() {
         Optional<String> category = matcher.matchCategory("obedga 15 ming", TransactionType.EXPENSE);
         assertTrue(category.isPresent());
-        assertEquals("Ovqat", category.get());
+        assertEquals("Oziq-ovqat", category.get());
     }
 
     @Test
-    @DisplayName("Match category: 'benzinga 300 ming' -> Yoqilg‘i")
+    @DisplayName("Match category: 'benzinga 300 ming' -> Transport va Yoqilg‘i")
     void testMatchYoqilgi() {
         Optional<String> category = matcher.matchCategory("benzinga 300 ming", TransactionType.EXPENSE);
         assertTrue(category.isPresent());
-        assertEquals("Yoqilg‘i", category.get());
+        assertEquals("Transport va Yoqilg‘i", category.get());
     }
 
     @Test
-    @DisplayName("Match category: 'mis trubaga 500 ming' -> Material")
+    @DisplayName("Match category: 'mis trubaga 500 ming' -> Biznes va Ish")
     void testMatchMaterial() {
         Optional<String> category = matcher.matchCategory("mis trubaga 500 ming", TransactionType.EXPENSE);
         assertTrue(category.isPresent());
-        assertEquals("Material", category.get());
+        assertEquals("Biznes va Ish", category.get());
     }
 
     @Test
-    @DisplayName("Match category: 'usta haqqiga 800 ming' -> Ish")
+    @DisplayName("Match category: 'usta haqqiga 800 ming' -> Biznes va Ish")
     void testMatchIsh() {
         Optional<String> category = matcher.matchCategory("usta haqqiga 800 ming", TransactionType.EXPENSE);
         assertTrue(category.isPresent());
-        assertEquals("Ish", category.get());
+        assertEquals("Biznes va Ish", category.get());
     }
 
     @Test
-    @DisplayName("Match category: 'taxi 25 ming' -> Transport")
+    @DisplayName("Match category: 'taxi 25 ming' -> Transport va Yoqilg‘i")
     void testMatchTransport() {
         Optional<String> category = matcher.matchCategory("taxi 25 ming", TransactionType.EXPENSE);
         assertTrue(category.isPresent());
-        assertEquals("Transport", category.get());
+        assertEquals("Transport va Yoqilg‘i", category.get());
     }
 
     @Test

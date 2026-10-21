@@ -160,6 +160,28 @@ public class CallbackQueryHandler {
                 return;
             }
 
+            if ("history".equals(target)) {
+                if ("ask".equals(op)) {
+                    apiClient.editMessageText(chatId, messageId,
+                            """
+                            ⚠️ <b>Barcha operatsiyalar tarixini o‘chirish:</b>
+
+                            Shu paytgacha kiritilgan <b>barcha xarajatlar, daromadlar va kunlik foydalar tarixi</b> ma'lumotlar bazasidan butkul o‘chiriladi.
+                            <i>Qarzlaringiz o‘chirilmaydi.</i>
+
+                            Rostdan ham barcha operatsiyalar tarixini bazadan o‘chirmoqchimisiz?
+                            """,
+                            inlineKeyboardFactory.getResetHistoryConfirmKeyboard(), "HTML");
+                } else if ("confirm".equals(op)) {
+                    dataResetService.deleteAllHistory(user.getId());
+                    apiClient.editMessageText(chatId, messageId,
+                            "✅ <b>Barcha operatsiyalar tarixi ma'lumotlar bazasidan muvaffaqiyatli o‘chirildi!</b>\n\n" +
+                            "Oldingi xarajatlar va foydalar tozalandi. Yangi hisob-kitobni toza noldan davom ettirishingiz mumkin.",
+                            null, "HTML");
+                }
+                return;
+            }
+
             if ("profit".equals(target)) {
                 if ("ask".equals(op)) {
                     apiClient.editMessageText(chatId, messageId,
@@ -218,11 +240,9 @@ public class CallbackQueryHandler {
                 } else if ("confirm".equals(op) || "confirm".equals(target)) {
                     dataResetService.resetAllUserData(user.getId());
                     apiClient.editMessageText(chatId, messageId,
-                            "✅ <b>Barcha ma'lumotlar tozalandi!</b>\n\n" +
+                            "✅ <b>Barcha ma'lumotlar ma'lumotlar bazasidan tozalandi!</b>\n\n" +
                             "📅 Hisob-kitobingiz <b>bugundan</b> boshlab toza holatda boshlandi.\n\n" +
-                            "Endi haqiqiy daromad va xarajatlaringizni bemalol yozib borishingiz mumkin:\n" +
-                            "💰 <b>Foydani kiritish</b> — bugungi foydangizni kiriting\n" +
-                            "💸 <b>Xarajat qo‘shish</b> — xarajatlaringizni yozib boring",
+                            "Xarajat yoki foydalarni bemalol audio (ovozli) yoki matn orqali yozishingiz mumkin.",
                             null, "HTML");
                     apiClient.sendMessage(chatId, "Asosiy menyu:", replyKeyboardFactory.getMainMenu(), null);
                 }

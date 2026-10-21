@@ -77,4 +77,20 @@ public class DataResetService {
         dailySummaryRepository.deleteByUserId(userId);
         log.info("All expenses deleted for user id: {}", userId);
     }
+
+    @Transactional
+    public void deleteAllHistory(Long userId) {
+        log.info("Deleting all transaction history, profits and summaries for user id: {}", userId);
+        draftRepository.deleteByUserId(userId);
+        transactionRepository.deleteByUserId(userId);
+        dailyProfitRepository.deleteByUserId(userId);
+        dailySummaryRepository.deleteByUserId(userId);
+
+        userBalanceRepository.findByUserId(userId).ifPresent(ub -> {
+            ub.setCashBalance(BigDecimal.ZERO);
+            ub.setCardBalance(BigDecimal.ZERO);
+            userBalanceRepository.save(ub);
+        });
+        log.info("All history deleted from database for user id: {}", userId);
+    }
 }

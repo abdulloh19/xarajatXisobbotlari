@@ -134,5 +134,7 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
 
     List<Debt> findByStatusInAndDueDateBefore(Collection<DebtStatus> statuses, LocalDate date);
 
-    void deleteByUserId(Long userId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Debt d WHERE d.user.id = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }

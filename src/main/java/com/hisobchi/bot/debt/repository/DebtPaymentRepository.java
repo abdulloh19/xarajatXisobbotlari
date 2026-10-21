@@ -63,5 +63,7 @@ public interface DebtPaymentRepository extends JpaRepository<DebtPayment, Long> 
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
 
-    void deleteByUserId(Long userId);
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM DebtPayment dp WHERE dp.user.id = :userId")
+    void deleteByUserId(@org.springframework.data.repository.query.Param("userId") Long userId);
 }
