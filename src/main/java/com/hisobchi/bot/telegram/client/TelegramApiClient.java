@@ -257,21 +257,10 @@ public class TelegramApiClient {
             setChatMenuButtonDefault();
             setMyCommands(List.of(
                     Map.of("command", "start", "description", "🏠 Asosiy menyu"),
-                    Map.of("command", "xarajat", "description", "💸 Xarajat qo‘shish"),
-                    Map.of("command", "daromad", "description", "💰 Daromad qo‘shish"),
-                    Map.of("command", "ovoz", "description", "🎙 Ovoz bilan kiritish"),
-                    Map.of("command", "foyda", "description", "💵 Kunlik foydani kiritish"),
-                    Map.of("command", "statistika", "description", "📊 Bugungi statistika"),
-                    Map.of("command", "haftalik", "description", "📅 Haftalik statistika"),
-                    Map.of("command", "oylik", "description", "🗓 Oylik statistika"),
-                    Map.of("command", "hisobot", "description", "📊 Davriy hisobotlar"),
-                    Map.of("command", "qarzlar", "description", "🤝 Qarzlar daftari"),
-                    Map.of("command", "tarix", "description", "📜 Operatsiyalar tarixi"),
-                    Map.of("command", "vazifalar", "description", "✅ Vazifalar va eslatmalar"),
-                    Map.of("command", "kategoriya", "description", "📂 Yangi kategoriya qo‘shish"),
-                    Map.of("command", "kunni_yopish", "description", "🔐 Kunni yopish"),
-                    Map.of("command", "sozlamalar", "description", "⚙️ Sozlamalar"),
-                    Map.of("command", "yordam", "description", "ℹ️ Yordam va qo‘llanma")
+                    Map.of("command", "kunlik", "description", "📊 Kunlik natija"),
+                    Map.of("command", "oylik", "description", "🗓 Oylik natija"),
+                    Map.of("command", "qarzlar", "description", "🤝 Qarzlar"),
+                    Map.of("command", "tozalash", "description", "🗑 Tarixni tozalash")
             ));
         } catch (Exception e) {
             log.warn("Could not initialize Telegram bot menu and commands: {}", e.getMessage());

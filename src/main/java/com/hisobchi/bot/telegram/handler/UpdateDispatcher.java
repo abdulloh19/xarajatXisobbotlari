@@ -104,8 +104,12 @@ public class UpdateDispatcher {
                 Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🎙 Ovoz bilan kiritish").build();
                 textMessageHandler.handle(user, msg);
             }
-            case "/statistika", "/stats" -> {
-                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Bugungi statistika").build();
+            case "/kunlik", "/statistika", "/stats" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Kunlik natija").build();
+                textMessageHandler.handle(user, msg);
+            }
+            case "/tozalash", "/reset" -> {
+                Message msg = Message.builder().chat(Chat.builder().id(chatId).build()).text("🗑 Tarixni tozalash").build();
                 textMessageHandler.handle(user, msg);
             }
             case "/haftalik" -> {

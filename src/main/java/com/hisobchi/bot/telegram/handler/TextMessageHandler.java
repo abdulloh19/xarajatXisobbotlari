@@ -265,31 +265,27 @@ public class TextMessageHandler {
         // 3. Handle Main Menu and Submenu button clicks
         switch (trimmed) {
             case "💸 Xarajat qo‘shish", "💸 Xarajat qo'shish", "Xarajat qo‘shish", "Xarajat qo'shish" -> {
-                userService.updateState(user.getTelegramId(), UserState.WAITING_EXPENSE_AMOUNT);
                 String msg = """
-                        💵 <b>Xarajat miqdorini kiriting:</b>
+                        💸 <b>Xarajat kiritish:</b>
 
+                        Menyudan tugma bosish shart emas! Shunchaki summani va nima ekanligini yozing yoki ovoz yuboring:
                         Masalan:
-                        <code>15000</code>
-                        yoki
-                        <code>15 000</code>
-                        yoki
-                        <code>15 ming</code>
+                        ✍️ <i>"15 ming obed"</i>
+                        ✍️ <i>"300 ming benzin"</i>
                         """;
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getCancelMenu(), "HTML");
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
             case "💰 Daromad qo‘shish", "💰 Daromad qo'shish", "Daromad qo‘shish", "Daromad qo'shish" -> {
-                userService.updateState(user.getTelegramId(), UserState.WAITING_INCOME_AMOUNT);
                 String msg = """
-                        💰 <b>Bugungi daromad summasini kiriting:</b>
+                        💰 <b>Foyda yoki daromad kiritish:</b>
 
+                        Menyudan tugma bosish shart emas! Shunchaki yozing yoki ovoz yuboring:
                         Masalan:
-                        <code>2500000</code>
-                        yoki
-                        <code>2.5 million</code>
+                        ✍️ <i>"500 ming foyda"</i>
+                        ✍️ <i>"Montajdan 2 million ishladim"</i>
                         """;
-                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getCancelMenu(), "HTML");
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
             case "🎙 Ovoz bilan kiritish" -> {
