@@ -306,7 +306,7 @@ public class TextMessageHandler {
                 LocalDate today = DateTimeUtils.today(user.getTimezone());
                 DailyStatisticsDto stats = statisticsService.getDailyStatistics(user, today);
                 String msg = BotMessageBuilder.buildDailyStatisticsMessage(stats);
-                apiClient.sendMessage(chatId, msg, inlineKeyboardFactory.getDailyReportActionsKeyboard(today), "HTML");
+                apiClient.sendMessage(chatId, msg, replyKeyboardFactory.getMainMenu(), "HTML");
                 return;
             }
             case "📅 Haftalik statistika" -> {
