@@ -61,9 +61,7 @@ public class CommandHandler {
                 ✍️ <i>"Javlonga 500 ming qarz berdim"</i>
 
                 3. <b>Menyu orqali:</b>
-                "💸 Xarajat qo‘shish", "💰 Daromad qo‘shish", "💵 Foydani kiritish", "📋 Qarzlar" yoki "📊 Hisobotlar" tugmasini bosing.
-
-                Har bir operatsiya avval tasdiqlash uchun ko‘rsatiladi!
+                Pastdagi tugmalar orqali kunlik/oylik natijalarni, qarzlarni ko‘rishingiz yoki tarixni tozalashingiz mumkin.
                 """;
         apiClient.sendMessage(chatId, help, replyKeyboardFactory.getMainMenu(), "HTML");
     }
