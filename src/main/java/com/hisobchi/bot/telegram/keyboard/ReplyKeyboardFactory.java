@@ -25,123 +25,30 @@ public class ReplyKeyboardFactory {
     }
 
     public ReplyKeyboardMarkup getReportsMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(
-                                new KeyboardButton("📅 Bugun"),
-                                new KeyboardButton("📆 Oxirgi 7 kun")
-                        ),
-                        List.of(
-                                new KeyboardButton("📆 Oxirgi 14 kun"),
-                                new KeyboardButton("📆 Oxirgi 21 kun")
-                        ),
-                        List.of(
-                                new KeyboardButton("🗓 Shu oy"),
-                                new KeyboardButton("🗓 O‘tgan oy")
-                        ),
-                        List.of(
-                                new KeyboardButton("⬅️ Asosiy menyu")
-                        )
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getDebtsMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(
-                                new KeyboardButton("💰 Qarz oldim"),
-                                new KeyboardButton("💸 Qarz berdim")
-                        ),
-                        List.of(
-                                new KeyboardButton("💳 Qarz to‘lash"),
-                                new KeyboardButton("💵 Qarz qaytardi")
-                        ),
-                        List.of(
-                                new KeyboardButton("📋 Men olgan qarzlar"),
-                                new KeyboardButton("📋 Men bergan qarzlar")
-                        ),
-                        List.of(
-                                new KeyboardButton("⚠️ Muddati yaqin"),
-                                new KeyboardButton("✅ Yopilgan qarzlar")
-                        ),
-                        List.of(
-                                new KeyboardButton("📊 Qarz statistikasi"),
-                                new KeyboardButton("⬅️ Asosiy menyu")
-                        )
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getPaymentMethodMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(
-                                new KeyboardButton("💵 Naqd"),
-                                new KeyboardButton("💳 Karta")
-                        ),
-                        List.of(
-                                new KeyboardButton("❌ Bekor qilish")
-                        )
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getCancelMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(new KeyboardButton("❌ Bekor qilish"))
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getSkipOrCancelMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(new KeyboardButton("⏭ O‘tkazib yuborish")),
-                        List.of(new KeyboardButton("❌ Bekor qilish"))
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getHistoryMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(
-                                new KeyboardButton("📅 Bugun"),
-                                new KeyboardButton("📅 Kecha")
-                        ),
-                        List.of(
-                                new KeyboardButton("📅 Oxirgi 7 kun"),
-                                new KeyboardButton("🗓 Shu oy")
-                        ),
-                        List.of(
-                                new KeyboardButton("🗑 Tarixni tozalash"),
-                                new KeyboardButton("⬅️ Asosiy menyu")
-                        )
-                ))
-                .build();
+        return getMainMenu();
     }
 
     public ReplyKeyboardMarkup getSettingsMenu() {
-        return ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(List.of(
-                        List.of(
-                                new KeyboardButton("➕ Yangi kategoriya"),
-                                new KeyboardButton("🔔 Eslatmalar")
-                        ),
-                        List.of(
-                                new KeyboardButton("🔄 Ma'lumotlarni tozalash")
-                        ),
-                        List.of(new KeyboardButton("⬅️ Asosiy menyu"))
-                ))
-                .build();
+        return getMainMenu();
     }
 }

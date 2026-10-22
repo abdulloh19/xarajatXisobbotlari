@@ -22,13 +22,36 @@ public class TelegramWebhookController {
     private final UpdateDispatcher updateDispatcher;
     private final BotConfig botConfig;
     private final TelegramApiClient apiClient;
+    private final com.hisobchi.bot.user.repository.UserRepository userRepository;
+    private final com.hisobchi.bot.telegram.keyboard.ReplyKeyboardFactory replyKeyboardFactory;
     private final ExecutorService updateExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    @GetMapping("/init-menu")
-    @PostMapping("/init-menu")
+    @RequestMapping(value = "/init-menu", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<String> initMenu() {
         apiClient.initBotMenuAndCommands();
         return ResponseEntity.ok("Telegram menu and commands initialized successfully!");
+    }
+
+    @RequestMapping(value = "/refresh-user-menu", method = {RequestMethod.GET, RequestMethod.POST})
+    public ResponseEntity<String> refreshUserMenu() {
+        apiClient.initBotMenuAndCommands();
+        var users = userRepository.findAll();
+        int count = 0;
+        for (var u : users) {
+            if (u.getTelegramId() != null) {
+                try {
+                    apiClient.sendMessage(u.getTelegramId(),
+                            "✨ <b>Asosiy menyu yangilandi!</b>\n\nPastdagi menyuda faqat asosiy bo‘limlar qoldirildi:\n" +
+                            "📊 Kunlik natija | 🗓 Oylik natija\n" +
+                            "🤝 Qarzlar | 🗑 Tarixni tozalash",
+                            replyKeyboardFactory.getMainMenu(), "HTML");
+                    count++;
+                } catch (Exception e) {
+                    log.warn("Could not send menu to user {}: {}", u.getTelegramId(), e.getMessage());
+                }
+            }
+        }
+        return ResponseEntity.ok("Updated menu sent to " + count + " users!");
     }
 
     @PostMapping("/webhook")

@@ -379,7 +379,7 @@ public class TextMessageHandler {
                         MoneyFormatter.format(borrowed),
                         MoneyFormatter.format(lent)
                 );
-                apiClient.sendMessage(chatId, overview, replyKeyboardFactory.getDebtsMenu(), "HTML");
+                apiClient.sendMessage(chatId, overview, inlineKeyboardFactory.getDebtsInlineMenu(), "HTML");
                 return;
             }
             case "💰 Qarz oldim", "💵 Qarz oldim" -> {

@@ -101,9 +101,24 @@ public class CallbackQueryHandler {
             case "debt" -> {
                 if (parts.length > 1 && "menu".equals(parts[1])) {
                     textMessageHandler.setUserActiveMenu(user.getId(), "DEBTS");
-                    apiClient.sendMessage(chatId, "🤝 <b>Qarzlar menyusi:</b>", replyKeyboardFactory.getDebtsMenu(), "HTML");
+                    apiClient.sendMessage(chatId, "🤝 <b>Qarzlar menyusi:</b>", inlineKeyboardFactory.getDebtsInlineMenu(), "HTML");
                 } else {
                     handleDebtCallback(user, chatId, messageId, parts);
+                }
+            }
+            case "debt_act" -> {
+                if (parts.length > 1) {
+                    String act = parts[1];
+                    switch (act) {
+                        case "borrow" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("💰 Qarz oldim").build());
+                        case "lend" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("💸 Qarz berdim").build());
+                        case "pay" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("💳 Qarz to‘lash").build());
+                        case "return" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("💵 Qarz qaytardi").build());
+                        case "my_borrowed" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("📋 Men olgan qarzlar").build());
+                        case "my_lent" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("📋 Men bergan qarzlar").build());
+                        case "stats" -> textMessageHandler.handle(user, Message.builder().chat(Chat.builder().id(chatId).build()).text("📊 Qarz statistikasi").build());
+                        default -> log.warn("Unknown debt_act: {}", act);
+                    }
                 }
             }
             case "debt_create" -> handleDebtCreateCallback(user, chatId, messageId, parts);

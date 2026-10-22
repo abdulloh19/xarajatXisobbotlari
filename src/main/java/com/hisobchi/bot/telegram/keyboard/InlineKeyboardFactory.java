@@ -919,4 +919,26 @@ public class InlineKeyboardFactory {
                 ))
                 .build();
     }
+
+    public InlineKeyboardMarkup getDebtsInlineMenu() {
+        return InlineKeyboardMarkup.builder()
+                .inlineKeyboard(List.of(
+                        List.of(
+                                new InlineKeyboardButton("💰 Qarz oldim", "debt_act:borrow"),
+                                new InlineKeyboardButton("💸 Qarz berdim", "debt_act:lend")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("💳 Qarz to‘lash", "debt_act:pay"),
+                                new InlineKeyboardButton("💵 Qarz qaytardi", "debt_act:return")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("📋 Men olgan qarzlar", "debt_act:my_borrowed"),
+                                new InlineKeyboardButton("📋 Men bergan qarzlar", "debt_act:my_lent")
+                        ),
+                        List.of(
+                                new InlineKeyboardButton("📊 Qarz statistikasi", "debt_act:stats")
+                        )
+                ))
+                .build();
+    }
 }
